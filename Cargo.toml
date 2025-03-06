@@ -1,0 +1,12 @@
+[package]
+name = "folded-falcon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+#cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold" }
+#latticefold = {  "https://github.com/nethermindeth/latticefold" }
+cyclotomic-rings = { path = "../latticefold/cyclotomic-rings" }
+latticefold = { path = "../latticefold/latticefold" }
+rand = "0.8"
