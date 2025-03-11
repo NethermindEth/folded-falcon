@@ -183,7 +183,7 @@ mod tests {
 
         let wit: Witness<RqNTT> = Witness::from_w_ccs::<DP>(w_ccs);
         let cm_i = CCCS {
-            cm: wit.commit::<C, W, DP>(&ajtai).unwrap(),
+            cm: wit.commit::<C, W, DP>(ajtai).unwrap(),
             x_ccs,
         };
 
@@ -213,7 +213,7 @@ mod tests {
         let comp0 = dummy_comp(&scheme);
         let mut agg = LFAcc::init(scheme, &comp0)?;
 
-        let comp1 = dummy_comp(&agg.ajtai());
+        let comp1 = dummy_comp(agg.ajtai());
         agg.fold(&comp1)?;
 
         Ok(())
@@ -229,7 +229,7 @@ mod tests {
         let mut ctx = LFVerifier::init(&comp0, &agg.proof)?;
 
         for _ in 0..3 {
-            let comp = dummy_comp(&agg.ajtai());
+            let comp = dummy_comp(agg.ajtai());
             agg.fold(&comp)?;
             ctx.verify(&comp, &agg.proof)?;
         }
