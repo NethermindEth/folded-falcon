@@ -5,7 +5,7 @@ use latticefold::{
     commitment::AjtaiCommitmentScheme,
     decomposition_parameters::DecompositionParams,
     nifs::{
-        LFProof, NIFSProver,
+        LFProof, NIFSProver, NIFSVerifier,
         linearization::{LFLinearizationProver, LinearizationProver},
     },
     transcript::poseidon::PoseidonTranscript,
@@ -25,19 +25,20 @@ type CS = GoldilocksChallengeSet;
 type TS = PoseidonTranscript<RqNTT, CS>;
 const C: usize = 8;
 const W: usize = WIT_LEN * DP::L;
-const WIT_LEN: usize = 4;
+const WIT_LEN: usize = 8;
 type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 
-/// Signature TODO rename
+/// Single non-accumulated LatticeFold instance
 #[derive(Clone, Debug)]
-pub struct Sig {
+pub struct LFComp {
     ccs: CCS<RqNTT>,
     cccs: CCCS<C, RqNTT>,
     witness: Witness<RqNTT>,
 }
 
-/// Accumulated signatures TODO rename
-pub struct AggregatedSig {
+/// Accumulated LatticeFold instance
+#[derive(Clone)]
+pub struct LFAcc {
     lcccs: LCCCS<C, RqNTT>,
     witness: Witness<RqNTT>,
     proof: LFProof<C, RqNTT>,
@@ -46,27 +47,29 @@ pub struct AggregatedSig {
     count: usize,
 }
 
-impl AggregatedSig {
-    /// Initializes an aggregated signatures object from a single signature.
-    pub fn init(ajtai: Ajtai, sig: &Sig) -> Result<Self> {
-        let mut transcript = PoseidonTranscript::<RqNTT, CS>::default();
+/// LatticeFold Verifier context
+#[derive(Clone)]
+pub struct LFVerifier {
+    transcript: TS,
+    lcccs: LCCCS<C, RqNTT>,
+    count: usize,
+}
 
-        // Linearize provided CCCS
-        let (lcccs, _) = LFLinearizationProver::<_, PoseidonTranscript<RqNTT, CS>>::prove(
-            &sig.cccs,
-            &sig.witness,
-            &mut transcript,
-            &sig.ccs,
-        )?;
+impl LFAcc {
+    /// Initializes an aggregated compnatures object from a single compnature.
+    pub fn init(ajtai: Ajtai, comp: &LFComp) -> Result<Self> {
+        let mut transcript = TS::default();
+
+        let lcccs = linearize(comp)?;
 
         // Create initial running proof
         let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
             &lcccs,
-            &sig.witness,
-            &sig.cccs,
-            &sig.witness,
+            &comp.witness,
+            &comp.cccs,
+            &comp.witness,
             &mut transcript,
-            &sig.ccs,
+            &comp.ccs,
             &ajtai,
         )?;
 
@@ -84,15 +87,15 @@ impl AggregatedSig {
         &self.ajtai
     }
 
-    /// Add a signature
-    pub fn fold(&mut self, sig: &Sig) -> Result<()> {
+    /// Fold in a [`LFComp`] instance
+    pub fn fold(&mut self, comp: &LFComp) -> Result<()> {
         let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
             &self.lcccs,
             &self.witness,
-            &sig.cccs,
-            &sig.witness,
+            &comp.cccs,
+            &comp.witness,
             &mut self.transcript,
-            &sig.ccs,
+            &comp.ccs,
             &self.ajtai,
         )?;
 
@@ -104,17 +107,55 @@ impl AggregatedSig {
         Ok(())
     }
 
-    /// Validate self
-    pub fn verify(&self) -> Result<()> {
-        // TODO
-        Ok(())
-    }
-
-    /// Size of aggregated signatures over size of separate signatures
+    /// Size of aggregated compnatures over size of separate compnatures
     pub fn compression_ratio(&self) -> f32 {
         // TODO self.serialize().len() / ( FalgonSig.serialize().len() * count )
         1.0
     }
+}
+
+impl LFVerifier {
+    pub fn init(comp: &LFComp, proof: &LFProof<C, RqNTT>) -> Result<Self> {
+        let mut transcript = TS::default();
+        let lcccs = linearize(comp)?;
+        let lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
+            &lcccs,
+            &comp.cccs,
+            proof,
+            &mut transcript,
+            &comp.ccs,
+        )?;
+
+        Ok(Self {
+            transcript,
+            lcccs,
+            count: 1,
+        })
+    }
+
+    pub fn verify(&mut self, comp: &LFComp, proof: &LFProof<C, RqNTT>) -> Result<()> {
+        self.lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
+            &self.lcccs,
+            &comp.cccs,
+            proof,
+            &mut self.transcript,
+            &comp.ccs,
+        )?;
+        self.count += 1;
+
+        Ok(())
+    }
+}
+
+fn linearize(comp: &LFComp) -> Result<LCCCS<C, RqNTT>> {
+    // Linearize provided CCCS
+    Ok(LFLinearizationProver::<_, TS>::prove(
+        &comp.cccs,
+        &comp.witness,
+        &mut TS::default(),
+        &comp.ccs,
+    )?
+    .0)
 }
 
 #[cfg(test)]
@@ -126,7 +167,7 @@ mod tests {
 
     const X_LEN: usize = 1;
 
-    fn dummy_sig(ajtai: &Ajtai) -> Sig {
+    fn dummy_comp(ajtai: &Ajtai) -> LFComp {
         let r1cs_rows = X_LEN + WIT_LEN + 1;
 
         let (one, x_ccs, w_ccs) = get_test_dummy_z_split_ntt::<RqNTT, X_LEN, WIT_LEN>();
@@ -146,7 +187,7 @@ mod tests {
             x_ccs,
         };
 
-        Sig {
+        LFComp {
             witness: wit,
             cccs: cm_i,
             ccs,
@@ -156,13 +197,42 @@ mod tests {
     #[test]
     fn test_fold() -> Result<()> {
         let mut rng = rand::thread_rng();
+
         let scheme = Ajtai::rand(&mut rng);
-        let sig = dummy_sig(&scheme);
+        let comp0 = dummy_comp(&scheme);
+        LFAcc::init(scheme, &comp0)?;
 
-        let mut agg = AggregatedSig::init(scheme, &sig)?;
-        let sig = dummy_sig(&agg.ajtai());
+        Ok(())
+    }
 
-        agg.fold(&sig)?;
+    #[test]
+    fn test_multifold() -> Result<()> {
+        let mut rng = rand::thread_rng();
+
+        let scheme = Ajtai::rand(&mut rng);
+        let comp0 = dummy_comp(&scheme);
+        let mut agg = LFAcc::init(scheme, &comp0)?;
+
+        let comp1 = dummy_comp(&agg.ajtai());
+        agg.fold(&comp1)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_multifold_verify() -> Result<()> {
+        let mut rng = rand::thread_rng();
+
+        let scheme = Ajtai::rand(&mut rng);
+        let comp0 = dummy_comp(&scheme);
+        let mut agg = LFAcc::init(scheme.clone(), &comp0)?;
+        let mut ctx = LFVerifier::init(&comp0, &agg.proof)?;
+
+        for _ in 0..3 {
+            let comp = dummy_comp(&agg.ajtai());
+            agg.fold(&comp)?;
+            ctx.verify(&comp, &agg.proof)?;
+        }
 
         Ok(())
     }

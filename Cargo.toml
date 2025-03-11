@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
-#cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold" }
-#latticefold = {  "https://github.com/nethermindeth/latticefold" }
-cyclotomic-rings = { path = "../latticefold/cyclotomic-rings" }
-latticefold = { path = "../latticefold/latticefold" }
+cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/fix-recompose-u" }
+latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/fix-recompose-u" }
+#cyclotomic-rings = { path = "../latticefold/cyclotomic-rings" }
+#latticefold = { path = "../latticefold/latticefold" }
 rand = "0.8"

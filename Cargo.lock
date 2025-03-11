@@ -246,6 +246,7 @@ dependencies = [
 [[package]]
 name = "cyclotomic-rings"
 version = "0.1.0"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Ffix-recompose-u#ee44eb314502b82c86b9f5679cff1770fdea8f23"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -406,6 +407,7 @@ dependencies = [
 [[package]]
 name = "latticefold"
 version = "0.1.0"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Ffix-recompose-u#ee44eb314502b82c86b9f5679cff1770fdea8f23"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -415,7 +417,6 @@ dependencies = [
  "hashbrown 0.15.2",
  "num-bigint",
  "num-traits",
- "paste",
  "proc-macro2",
  "quote",
  "rand",
