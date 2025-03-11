@@ -1,4 +1,5 @@
 mod lfold;
+
 pub use lfold::{LFAcc, LFComp, LFVerifier};
 
 /// Witness, signature vector components

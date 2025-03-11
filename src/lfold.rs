@@ -41,7 +41,6 @@ pub struct LFComp {
 pub struct LFAcc {
     lcccs: LCCCS<C, RqNTT>,
     witness: Witness<RqNTT>,
-    proof: LFProof<C, RqNTT>,
     transcript: TS,
     ajtai: AjtaiCommitmentScheme<C, W, RqNTT>,
     count: usize,
@@ -57,7 +56,7 @@ pub struct LFVerifier {
 
 impl LFAcc {
     /// Initializes an aggregated compnatures object from a single compnature.
-    pub fn init(ajtai: Ajtai, comp: &LFComp) -> Result<Self> {
+    pub fn init(ajtai: Ajtai, comp: &LFComp) -> Result<(Self, LFProof<C, RqNTT>)> {
         let mut transcript = TS::default();
 
         let lcccs = linearize(comp)?;
@@ -73,14 +72,16 @@ impl LFAcc {
             &ajtai,
         )?;
 
-        Ok(Self {
-            lcccs,
-            witness,
+        Ok((
+            Self {
+                lcccs,
+                witness,
+                transcript,
+                ajtai,
+                count: 1,
+            },
             proof,
-            transcript,
-            ajtai,
-            count: 1,
-        })
+        ))
     }
 
     pub const fn ajtai(&self) -> &Ajtai {
@@ -88,7 +89,7 @@ impl LFAcc {
     }
 
     /// Fold in a [`LFComp`] instance
-    pub fn fold(&mut self, comp: &LFComp) -> Result<()> {
+    pub fn fold(&mut self, comp: &LFComp) -> Result<LFProof<C, RqNTT>> {
         let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
             &self.lcccs,
             &self.witness,
@@ -101,10 +102,9 @@ impl LFAcc {
 
         self.lcccs = lcccs;
         self.witness = witness;
-        self.proof = proof;
         self.count += 1;
 
-        Ok(())
+        Ok(proof)
     }
 
     /// Size of aggregated compnatures over size of separate compnatures
@@ -211,7 +211,7 @@ mod tests {
 
         let scheme = Ajtai::rand(&mut rng);
         let comp0 = dummy_comp(&scheme);
-        let mut agg = LFAcc::init(scheme, &comp0)?;
+        let mut agg = LFAcc::init(scheme, &comp0)?.0;
 
         let comp1 = dummy_comp(agg.ajtai());
         agg.fold(&comp1)?;
@@ -225,13 +225,13 @@ mod tests {
 
         let scheme = Ajtai::rand(&mut rng);
         let comp0 = dummy_comp(&scheme);
-        let mut agg = LFAcc::init(scheme.clone(), &comp0)?;
-        let mut ctx = LFVerifier::init(&comp0, &agg.proof)?;
+        let (mut agg, proof) = LFAcc::init(scheme.clone(), &comp0)?;
+        let mut ctx = LFVerifier::init(&comp0, &proof)?;
 
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai());
-            agg.fold(&comp)?;
-            ctx.verify(&comp, &agg.proof)?;
+            let proof = agg.fold(&comp)?;
+            ctx.verify(&comp, &proof)?;
         }
 
         Ok(())
