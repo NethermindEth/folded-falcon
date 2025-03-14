@@ -1,46 +1,29 @@
 # Aggregated Falcon Signatures using LatticeFold
 
-## Falcon overview
+## Falcon signature scheme overview
+Falcon operates over a cyclotomic ring of degree $d = \{ 512, 1024 \}$ with modulus $p = 12289$.
+ 
+### Sign(sk, m)
+- Sample random salt: $r \leftarrow \{0, 1\}^k$
+- Compute: $c = H(pk, r, msg)$
+- Generate signature components: $(s_1, s_2) \leftarrow [(sk, c) \rightarrow (s_1, s_2) \sim D^2]$
+- Ensure norm constraint: $\|(s_1, s_2)\|_2  \leq \beta$
+- Output signature: $sig = (r, s_2)$
 
-mod p = 12289
+### Ver(pk = h, msg, sig)
+- Recompute: $c = H(pk, r, m)$
+- Compute: $s_1 = c - s_2  \cdot h$
+- Verify norm constraint: $\|(s_1, s_2)\|_2  \leq \beta$
 
-### ..Sign(sk, m)
-r <- {0, 1}^k
+## Aggregation system
 
-c = H(pk, r, msg) e Rq
+**Witness**: Signature $(s_1, s_2)$
+**Statement**: $c = Hash(msg, h, r)$
+**Relation**: $s_1  \cdot h + s_2 - c \equiv 0  \pmod{p}$ and $(s_1, s_2)$ are small
 
-(s1, s2) <- [ (sk, c) -> (s1, s2) ~ D^2 ]
+If we lift $p$ to $q$, where $q \gg p$, to avoid wraparound we add a $p \cdot v$ term: $s_1  \cdot h + s_2 + p \cdot v - c \equiv 0  \pmod{q}$
+where, $v = -(s_1  \cdot h + s_2 - c) / p \bmod q$ and $v$ must also be small
 
-||(s1, s2)||₂ <= β
+### Used ring
 
-sig = (r, s2)
-
-### ..Ver(pk = h, msg, sig)
-c = H(pk, r, m)
-
-s1 = c - s2 * h
-
-return ||(s1, s2)||₂ <= β
-
-
-
-## Possible system
-
-Witness: Signature = (s1, s2)
-
-Statement: c = Hash(msg, h, r)
-
-Relation: s1 * h + s2 - c = 0  mod p,
-    AND (s1, s2) small
-
-if we lift p to q, where q >> p, to avoid wraparound we add a (p*v) term
-
-    s1 * h + s2 + p*v - c = 0  mod q
-    
-where v = -(s1 * h + s2 - c) / p  moq q
-    AND v must be also small
-
-### Some questions
-- Need to account for degree difference?
-- Replace random oracle (which creates r), by some concrete hash function?
-  LaBRADOR dot system does not support but R1CS does?
+## References
