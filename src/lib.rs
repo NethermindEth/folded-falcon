@@ -1,4 +1,5 @@
 mod lfold;
+mod falcon;
 
 pub use lfold::{LFAcc, LFComp, LFVerifier};
 
