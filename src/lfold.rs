@@ -23,40 +23,37 @@ impl DecompositionParams for DP {
 type RqNTT = GoldilocksRingNTT;
 type CS = GoldilocksChallengeSet;
 type TS = PoseidonTranscript<RqNTT, CS>;
-const C: usize = 8;
-const W: usize = WIT_LEN * DP::L;
-const WIT_LEN: usize = 8;
-type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
+type Ajtai<const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, RqNTT>;
 
 /// Single non-accumulated LatticeFold instance
 #[derive(Clone, Debug)]
-pub struct LFComp {
-    ccs: CCS<RqNTT>,
-    cccs: CCCS<C, RqNTT>,
-    witness: Witness<RqNTT>,
+pub struct LFComp<const C: usize> {
+    pub ccs: CCS<RqNTT>,
+    pub cccs: CCCS<C, RqNTT>,
+    pub witness: Witness<RqNTT>,
 }
 
 /// Accumulated LatticeFold instance
 #[derive(Clone)]
-pub struct LFAcc {
-    lcccs: LCCCS<C, RqNTT>,
-    witness: Witness<RqNTT>,
-    transcript: TS,
-    ajtai: AjtaiCommitmentScheme<C, W, RqNTT>,
-    count: usize,
+pub struct LFAcc<const C: usize, const W: usize> {
+    pub lcccs: LCCCS<C, RqNTT>,
+    pub witness: Witness<RqNTT>,
+    pub transcript: TS,
+    pub ajtai: Ajtai<C, W>,
+    pub count: usize,
 }
 
 /// LatticeFold Verifier context
 #[derive(Clone)]
-pub struct LFVerifier {
+pub struct LFVerifier<const C: usize> {
     transcript: TS,
     lcccs: LCCCS<C, RqNTT>,
     count: usize,
 }
 
-impl LFAcc {
+impl<const C: usize, const W: usize> LFAcc<C, W> {
     /// Initializes an aggregated compnatures object from a single compnature.
-    pub fn init(ajtai: Ajtai, comp: &LFComp) -> Result<(Self, LFProof<C, RqNTT>)> {
+    pub fn init(ajtai: Ajtai<C, W>, comp: &LFComp<C>) -> Result<(Self, LFProof<C, RqNTT>)> {
         let mut transcript = TS::default();
 
         let lcccs = linearize(comp)?;
@@ -84,12 +81,12 @@ impl LFAcc {
         ))
     }
 
-    pub const fn ajtai(&self) -> &Ajtai {
+    pub const fn ajtai(&self) -> &Ajtai<C, W> {
         &self.ajtai
     }
 
     /// Fold in a [`LFComp`] instance
-    pub fn fold(&mut self, comp: &LFComp) -> Result<LFProof<C, RqNTT>> {
+    pub fn fold(&mut self, comp: &LFComp<C>) -> Result<LFProof<C, RqNTT>> {
         let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
             &self.lcccs,
             &self.witness,
@@ -114,8 +111,8 @@ impl LFAcc {
     }
 }
 
-impl LFVerifier {
-    pub fn init(comp: &LFComp, proof: &LFProof<C, RqNTT>) -> Result<Self> {
+impl<const C: usize> LFVerifier<C> {
+    pub fn init(comp: &LFComp<C>, proof: &LFProof<C, RqNTT>) -> Result<Self> {
         let mut transcript = TS::default();
         let lcccs = linearize(comp)?;
         let lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
@@ -133,7 +130,7 @@ impl LFVerifier {
         })
     }
 
-    pub fn verify(&mut self, comp: &LFComp, proof: &LFProof<C, RqNTT>) -> Result<()> {
+    pub fn verify(&mut self, comp: &LFComp<C>, proof: &LFProof<C, RqNTT>) -> Result<()> {
         self.lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
             &self.lcccs,
             &comp.cccs,
@@ -147,7 +144,7 @@ impl LFVerifier {
     }
 }
 
-fn linearize(comp: &LFComp) -> Result<LCCCS<C, RqNTT>> {
+fn linearize<const C: usize>(comp: &LFComp<C>) -> Result<LCCCS<C, RqNTT>> {
     // Linearize provided CCCS
     Ok(LFLinearizationProver::<_, TS>::prove(
         &comp.cccs,
@@ -165,9 +162,12 @@ mod tests {
         Arith, ccs::get_test_dummy_degree_three_ccs_non_scalar, r1cs::get_test_dummy_z_split_ntt,
     };
 
+    const C: usize = 8;
+    const W: usize = WIT_LEN * DP::L;
+    const WIT_LEN: usize = 8;
     const X_LEN: usize = 1;
 
-    fn dummy_comp(ajtai: &Ajtai) -> LFComp {
+    fn dummy_comp(ajtai: &Ajtai<C, W>) -> LFComp<C> {
         let r1cs_rows = X_LEN + WIT_LEN + 1;
 
         let (one, x_ccs, w_ccs) = get_test_dummy_z_split_ntt::<RqNTT, X_LEN, WIT_LEN>();
