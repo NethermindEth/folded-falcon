@@ -1,8 +1,10 @@
 mod falcon;
 mod lfold;
 pub mod r1cs;
+mod subring;
 
 pub use lfold::{LFAcc, LFComp, LFVerifier};
+pub use subring::SplitRing;
 
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
