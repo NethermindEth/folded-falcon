@@ -9,7 +9,7 @@ pub fn signature_verification_r1cs() -> R1CS<RqNTT> {
     cs.ninputs = 2;
     cs.nauxs = 4;
     // Variables
-    // 0: c
+    // 0: c = Hash(r, msg)
     // 1: h
     // 2: 1
     // 3: s1
