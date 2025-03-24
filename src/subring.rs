@@ -1,13 +1,21 @@
+use cyclotomic_rings::rings::SuitableRing;
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
-use stark_rings::{PolyRing, balanced_decomposition::convertible_ring::ConvertibleRing};
+use stark_rings::{
+    PolyRing, balanced_decomposition::convertible_ring::ConvertibleRing, cyclotomic_ring::CRT,
+};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 
-/// A ring R's decomposed representation into subrings S
+/// A ring R's decomposed representation into subrings S. Elements are in coefficient form.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SplitRing<S: PolyRing>(Vec<S>);
+pub struct SplitRingPoly<S: PolyRing>(Vec<S>);
 
-impl<S: PolyRing> SplitRing<S> {
+/// A ring R's decomposed representation into subrings S. Elements are in NTT form, employable in
+/// LatticeFold.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SplitRing<S: SuitableRing>(Vec<S>);
+
+impl<S: PolyRing> SplitRingPoly<S> {
     /// Maps an element from ring R of degree d*k to k elements in subring S of degree d
     ///
     /// Bijection ϕ: R → S^k where:
@@ -63,9 +71,17 @@ impl<S: PolyRing> SplitRing<S> {
 
         r
     }
+
+    /// Converts self's coefficient form into its NTT form
+    pub fn crt<U: SuitableRing>(self) -> SplitRing<U>
+    where
+        S: CRT<CRTForm = U>,
+    {
+        SplitRing(CRT::elementwise_crt(self.0))
+    }
 }
 
-impl<S: PolyRing> AddAssign for SplitRing<S> {
+impl<S: PolyRing> AddAssign for SplitRingPoly<S> {
     fn add_assign(&mut self, rhs: Self) {
         self.0
             .iter_mut()
@@ -74,7 +90,7 @@ impl<S: PolyRing> AddAssign for SplitRing<S> {
     }
 }
 
-impl<S: PolyRing> Add for SplitRing<S> {
+impl<S: PolyRing> Add for SplitRingPoly<S> {
     type Output = Self;
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
@@ -82,7 +98,7 @@ impl<S: PolyRing> Add for SplitRing<S> {
     }
 }
 
-impl<S: PolyRing> MulAssign for SplitRing<S> {
+impl<S: PolyRing> MulAssign for SplitRingPoly<S> {
     fn mul_assign(&mut self, rhs: Self) {
         let k = self.0.len();
 
@@ -105,7 +121,7 @@ impl<S: PolyRing> MulAssign for SplitRing<S> {
     }
 }
 
-impl<S: PolyRing> Mul for SplitRing<S> {
+impl<S: PolyRing> Mul for SplitRingPoly<S> {
     type Output = Self;
 
     fn mul(mut self, rhs: Self) -> Self::Output {
@@ -130,7 +146,7 @@ mod tests {
         r[10] = 5;
         r[0] = 4;
 
-        let s = SplitRing::<Rq>::from_r(&r);
+        let s = SplitRingPoly::<Rq>::from_r(&r);
 
         // 4 -> 4 (0)
         // 5X^10 -> 5 (10)
@@ -153,7 +169,7 @@ mod tests {
         r[10] = 5;
         r[0] = 4;
 
-        let s: SplitRing<Rq> = SplitRing::from_r(&r);
+        let s: SplitRingPoly<Rq> = SplitRingPoly::from_r(&r);
         let recomposed = s.recompose();
 
         assert_eq!(r, recomposed);
@@ -168,8 +184,8 @@ mod tests {
         r2[10] = 5;
 
         // expected 5X^10 -> s_10 = 5
-        let s1: SplitRing<Rq> = SplitRing::from_r(&r1);
-        let s2: SplitRing<Rq> = SplitRing::from_r(&r2);
+        let s1: SplitRingPoly<Rq> = SplitRingPoly::from_r(&r1);
+        let s2: SplitRingPoly<Rq> = SplitRingPoly::from_r(&r2);
 
         let sm = s1 + s2;
         let rm = sm.recompose();
@@ -190,8 +206,8 @@ mod tests {
         r2[10] = 5;
 
         // expected 5X^10 -> s_10 = 5
-        let s1: SplitRing<Rq> = SplitRing::from_r(&r1);
-        let s2: SplitRing<Rq> = SplitRing::from_r(&r2);
+        let s1: SplitRingPoly<Rq> = SplitRingPoly::from_r(&r1);
+        let s2: SplitRingPoly<Rq> = SplitRingPoly::from_r(&r2);
 
         let sm = s1 * s2;
         let rm = sm.recompose();

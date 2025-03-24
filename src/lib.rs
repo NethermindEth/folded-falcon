@@ -4,7 +4,7 @@ pub mod r1cs;
 mod subring;
 
 pub use lfold::{LFAcc, LFComp, LFVerifier};
-pub use subring::SplitRing;
+pub use subring::SplitRingPoly;
 
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
