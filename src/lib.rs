@@ -4,7 +4,7 @@ pub mod r1cs;
 mod subring;
 
 pub use lfold::{LFAcc, LFComp, LFVerifier};
-pub use subring::SplitRingPoly;
+pub use subring::{SplitRing, SplitRingPoly};
 
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
@@ -27,7 +27,7 @@ pub struct FalconInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cyclotomic_rings::rings::GoldilocksRingNTT;
+    use cyclotomic_rings::rings::FrogRingNTT;
     use latticefold::{
         arith::{Arith, CCCS, CCS, Witness},
         commitment::AjtaiCommitmentScheme,
@@ -45,7 +45,7 @@ mod tests {
     const W: usize = WIT_LEN * DP::L;
     const WIT_LEN: usize = 3;
     type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
-    type RqNTT = GoldilocksRingNTT;
+    type RqNTT = FrogRingNTT;
 
     fn dummy_comp(ajtai: &Ajtai) -> LFComp<C> {
         let z = &[

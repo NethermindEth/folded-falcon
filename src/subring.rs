@@ -81,12 +81,24 @@ impl<S: PolyRing> SplitRingPoly<S> {
     {
         SplitRing(CRT::elementwise_crt(self.0))
     }
+
+    pub fn into_vec(self) -> Vec<S> {
+        self.0
+    }
 }
 
 impl<U: SuitableRing> SplitRing<U> {
     /// Converts self's coefficient form into its NTT form
     pub fn icrt(self) -> SplitRingPoly<U::CoefficientRepresentation> {
         SplitRingPoly(ICRT::elementwise_icrt(self.0))
+    }
+
+    pub fn splits(&self) -> &[U] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<U> {
+        self.0
     }
 }
 
@@ -166,6 +178,13 @@ impl<U: SuitableRing> Mul for SplitRing<U> {
 impl<U: SuitableRing> MulAssign for SplitRing<U> {
     fn mul_assign(&mut self, rhs: Self) {
         *self = self.clone() * rhs;
+    }
+}
+
+impl<U: SuitableRing> std::ops::Index<usize> for SplitRing<U> {
+    type Output = U;
+    fn index(&self, index: usize) -> &U {
+        &self.0[index]
     }
 }
 

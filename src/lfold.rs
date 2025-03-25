@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cyclotomic_rings::rings::{GoldilocksChallengeSet, GoldilocksRingNTT};
+use cyclotomic_rings::rings::{FrogChallengeSet, FrogRingNTT};
 use latticefold::{
     arith::{CCCS, CCS, LCCCS, Witness},
     commitment::AjtaiCommitmentScheme,
@@ -20,8 +20,8 @@ impl DecompositionParams for DP {
     const B_SMALL: usize = 2;
     const K: usize = 15;
 }
-type RqNTT = GoldilocksRingNTT;
-type CS = GoldilocksChallengeSet;
+type RqNTT = FrogRingNTT;
+type CS = FrogChallengeSet;
 type TS = PoseidonTranscript<RqNTT, CS>;
 type Ajtai<const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, RqNTT>;
 
