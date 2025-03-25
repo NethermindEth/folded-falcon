@@ -141,11 +141,11 @@ mod tests {
 
             // output poly t = [t_l]
             let mut t = vec![RqNTT::from(0u32); k];
-            for l in 0..k {
+            for (l, tl) in t.iter_mut().enumerate() {
                 for i in 0..k {
                     for j in 0..k {
                         if (i + j) % k == l {
-                            t[l] = t[l] + aux_vars[i * k + j];
+                            *tl += aux_vars[i * k + j];
                         }
                     }
                 }

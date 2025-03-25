@@ -1,6 +1,6 @@
 use cyclotomic_rings::rings::SuitableRing;
 use num_bigint::BigUint;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use stark_rings::{
     PolyRing,
     balanced_decomposition::convertible_ring::ConvertibleRing,
@@ -37,8 +37,8 @@ impl<S: PolyRing> SplitRingPoly<S> {
 
         let mut s = vec![S::from(0u128); k];
 
-        for g in 0..dk {
-            if r_coeffs[g] == 0u128 {
+        for (g, coeff) in r_coeffs.iter().enumerate() {
+            if coeff.is_zero() {
                 continue;
             }
 
