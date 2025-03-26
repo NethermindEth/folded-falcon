@@ -7,7 +7,8 @@ edition = "2024"
 anyhow = "1"
 cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
 latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
-#cyclotomic-rings = { path = "../latticefold/cyclotomic-rings" }
-#latticefold = { path = "../latticefold/latticefold" }
+stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
+num-bigint = "0.4"
+num-traits = "0.2"
 rand = "0.8"
 falcon-rust = "0.1.2"

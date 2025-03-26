@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "cyclotomic-rings"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#f62a4235d95f674b3900d3376fa810d8fd682153"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#64c9b73a617f37f3138c9a994af8862ab99f0541"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "delegate"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "297806318ef30ad066b15792a8372858020ae3ca2e414ee6c2133b1eb9e9e945"
+checksum = "b9b6483c2bbed26f97861cf57651d4f2b731964a28cd2257f934a4b452480d21"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -353,7 +353,10 @@ dependencies = [
  "cyclotomic-rings",
  "falcon-rust",
  "latticefold",
+ "num-bigint",
+ "num-traits",
  "rand",
+ "stark-rings",
 ]
 
 [[package]]
@@ -449,7 +452,7 @@ dependencies = [
 [[package]]
 name = "latticefold"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#f62a4235d95f674b3900d3376fa810d8fd682153"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#64c9b73a617f37f3138c9a994af8862ab99f0541"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -600,7 +603,7 @@ version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
- "zerocopy 0.8.23",
+ "zerocopy 0.8.24",
 ]
 
 [[package]]
@@ -944,11 +947,11 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.23"
+version = "0.8.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd97444d05a4328b90e75e503a34bad781f14e28a823ad3557f0750df1ebcbc6"
+checksum = "2586fea28e186957ef732a5f8b3be2da217d65c5969d4b1e17f973ebbe876879"
 dependencies = [
- "zerocopy-derive 0.8.23",
+ "zerocopy-derive 0.8.24",
 ]
 
 [[package]]
@@ -964,9 +967,9 @@ dependencies = [
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.23"
+version = "0.8.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6352c01d0edd5db859a63e2605f4ea3183ddbd15e2c4a9e7d32184df75e4f154"
+checksum = "a996a8f63c5c4448cd959ac1bab0aaa3306ccfd060472f85943ee0750f0169be"
 dependencies = [
  "proc-macro2",
  "quote",
