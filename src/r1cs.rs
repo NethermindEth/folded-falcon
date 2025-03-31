@@ -1,11 +1,9 @@
-use cyclotomic_rings::rings::FrogRingNTT;
+use cyclotomic_rings::rings::SuitableRing;
 use latticefold::arith::r1cs::{Constraint, ConstraintSystem, LinearCombination, R1CS};
 
-type RqNTT = FrogRingNTT;
-
-pub fn signature_verification_r1cs() -> R1CS<RqNTT> {
+pub fn signature_verification_r1cs<R: SuitableRing>() -> R1CS<R> {
     // s1 + s2*h = c
-    let mut cs = ConstraintSystem::<RqNTT>::new();
+    let mut cs = ConstraintSystem::<R>::new();
     cs.ninputs = 2;
     cs.nauxs = 4;
     // Variables
@@ -30,8 +28,8 @@ pub fn signature_verification_r1cs() -> R1CS<RqNTT> {
     cs.to_r1cs()
 }
 
-pub fn splitring_mul_r1cs(k: usize) -> R1CS<RqNTT> {
-    let mut cs = ConstraintSystem::<RqNTT>::new();
+pub fn splitring_mul_r1cs<R: SuitableRing>(k: usize) -> R1CS<R> {
+    let mut cs = ConstraintSystem::<R>::new();
 
     // Variables:
     // 0..k-1: input s = [s_i]
@@ -84,8 +82,7 @@ pub fn splitring_mul_r1cs(k: usize) -> R1CS<RqNTT> {
 mod tests {
     use super::*;
     use crate::{SplitRing, SplitRingPoly};
-    use cyclotomic_rings::rings::FrogRingPoly;
-    type RqPoly = FrogRingPoly;
+    use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
 
     #[test]
     fn test_r1cs_signature_verification() {

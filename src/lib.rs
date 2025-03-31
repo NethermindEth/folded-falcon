@@ -27,7 +27,7 @@ pub struct FalconInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cyclotomic_rings::rings::FrogRingNTT;
+    use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
     use latticefold::{
         arith::{Arith, CCCS, CCS, Witness},
         commitment::AjtaiCommitmentScheme,
@@ -45,9 +45,8 @@ mod tests {
     const W: usize = WIT_LEN * DP::L;
     const WIT_LEN: usize = 3;
     type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
-    type RqNTT = FrogRingNTT;
 
-    fn dummy_comp(ajtai: &Ajtai) -> LFComp<C> {
+    fn dummy_comp(ajtai: &Ajtai) -> LFComp<RqNTT, C> {
         let z = &[
             RqNTT::from(7u32),
             RqNTT::from(3u32),
@@ -82,8 +81,8 @@ mod tests {
 
         let scheme = Ajtai::rand(&mut rng);
         let comp0 = dummy_comp(&scheme);
-        let (mut agg, proof) = LFAcc::init(scheme, &comp0).unwrap();
-        let mut ctx = LFVerifier::init(&comp0, &proof).unwrap();
+        let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0).unwrap();
+        let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof).unwrap();
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai());
             let proof = agg.fold(&comp).unwrap();

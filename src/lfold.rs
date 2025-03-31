@@ -1,5 +1,7 @@
 use anyhow::Result;
-use cyclotomic_rings::rings::{FrogChallengeSet, FrogRingNTT};
+use cyclotomic_rings::{
+    challenge_set::LatticefoldChallengeSet as ChallengeSet, rings::SuitableRing,
+};
 use latticefold::{
     arith::{CCCS, CCS, LCCCS, Witness},
     commitment::AjtaiCommitmentScheme,
@@ -20,46 +22,44 @@ impl DecompositionParams for DP {
     const B_SMALL: usize = 2;
     const K: usize = 15;
 }
-type RqNTT = FrogRingNTT;
-type CS = FrogChallengeSet;
-type TS = PoseidonTranscript<RqNTT, CS>;
-type Ajtai<const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, RqNTT>;
+type TS<R, CS> = PoseidonTranscript<R, CS>;
+type Ajtai<R, const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, R>;
 
 /// Single non-accumulated LatticeFold instance
 #[derive(Clone, Debug)]
-pub struct LFComp<const C: usize> {
-    pub ccs: CCS<RqNTT>,
-    pub cccs: CCCS<C, RqNTT>,
-    pub witness: Witness<RqNTT>,
+pub struct LFComp<R: SuitableRing, const C: usize> {
+    pub ccs: CCS<R>,
+    pub cccs: CCCS<C, R>,
+    pub witness: Witness<R>,
 }
 
 /// Accumulated LatticeFold instance
 #[derive(Clone)]
-pub struct LFAcc<const C: usize, const W: usize> {
-    pub lcccs: LCCCS<C, RqNTT>,
-    pub witness: Witness<RqNTT>,
-    pub transcript: TS,
-    pub ajtai: Ajtai<C, W>,
+pub struct LFAcc<R: SuitableRing, CS: ChallengeSet<R>, const C: usize, const W: usize> {
+    pub lcccs: LCCCS<C, R>,
+    pub witness: Witness<R>,
+    pub transcript: TS<R, CS>,
+    pub ajtai: Ajtai<R, C, W>,
     pub count: usize,
 }
 
 /// LatticeFold Verifier context
 #[derive(Clone)]
-pub struct LFVerifier<const C: usize> {
-    transcript: TS,
-    lcccs: LCCCS<C, RqNTT>,
+pub struct LFVerifier<R: SuitableRing, CS: ChallengeSet<R>, const C: usize> {
+    transcript: TS<R, CS>,
+    lcccs: LCCCS<C, R>,
     count: usize,
 }
 
-impl<const C: usize, const W: usize> LFAcc<C, W> {
+impl<R: SuitableRing, CS: ChallengeSet<R>, const C: usize, const W: usize> LFAcc<R, CS, C, W> {
     /// Initializes an aggregated compnatures object from a single compnature.
-    pub fn init(ajtai: Ajtai<C, W>, comp: &LFComp<C>) -> Result<(Self, LFProof<C, RqNTT>)> {
-        let mut transcript = TS::default();
+    pub fn init(ajtai: Ajtai<R, C, W>, comp: &LFComp<R, C>) -> Result<(Self, LFProof<C, R>)> {
+        let mut transcript = TS::<R, CS>::default();
 
-        let lcccs = linearize(comp)?;
+        let lcccs = linearize::<_, CS, C>(comp)?;
 
         // Create initial running proof
-        let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
+        let (lcccs, witness, proof) = NIFSProver::<C, W, R, DP, TS<R, CS>>::prove(
             &lcccs,
             &comp.witness,
             &comp.cccs,
@@ -81,13 +81,13 @@ impl<const C: usize, const W: usize> LFAcc<C, W> {
         ))
     }
 
-    pub const fn ajtai(&self) -> &Ajtai<C, W> {
+    pub const fn ajtai(&self) -> &Ajtai<R, C, W> {
         &self.ajtai
     }
 
     /// Fold in a [`LFComp`] instance
-    pub fn fold(&mut self, comp: &LFComp<C>) -> Result<LFProof<C, RqNTT>> {
-        let (lcccs, witness, proof) = NIFSProver::<C, W, RqNTT, DP, TS>::prove(
+    pub fn fold(&mut self, comp: &LFComp<R, C>) -> Result<LFProof<C, R>> {
+        let (lcccs, witness, proof) = NIFSProver::<C, W, R, DP, TS<R, CS>>::prove(
             &self.lcccs,
             &self.witness,
             &comp.cccs,
@@ -111,11 +111,11 @@ impl<const C: usize, const W: usize> LFAcc<C, W> {
     }
 }
 
-impl<const C: usize> LFVerifier<C> {
-    pub fn init(comp: &LFComp<C>, proof: &LFProof<C, RqNTT>) -> Result<Self> {
-        let mut transcript = TS::default();
-        let lcccs = linearize(comp)?;
-        let lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
+impl<R: SuitableRing, CS: ChallengeSet<R>, const C: usize> LFVerifier<R, CS, C> {
+    pub fn init(comp: &LFComp<R, C>, proof: &LFProof<C, R>) -> Result<Self> {
+        let mut transcript = TS::<R, CS>::default();
+        let lcccs = linearize::<R, CS, C>(comp)?;
+        let lcccs = NIFSVerifier::<C, R, DP, TS<R, CS>>::verify(
             &lcccs,
             &comp.cccs,
             proof,
@@ -130,8 +130,8 @@ impl<const C: usize> LFVerifier<C> {
         })
     }
 
-    pub fn verify(&mut self, comp: &LFComp<C>, proof: &LFProof<C, RqNTT>) -> Result<()> {
-        self.lcccs = NIFSVerifier::<C, RqNTT, DP, TS>::verify(
+    pub fn verify(&mut self, comp: &LFComp<R, C>, proof: &LFProof<C, R>) -> Result<()> {
+        self.lcccs = NIFSVerifier::<C, R, DP, TS<R, CS>>::verify(
             &self.lcccs,
             &comp.cccs,
             proof,
@@ -144,12 +144,14 @@ impl<const C: usize> LFVerifier<C> {
     }
 }
 
-fn linearize<const C: usize>(comp: &LFComp<C>) -> Result<LCCCS<C, RqNTT>> {
+fn linearize<R: SuitableRing, CS: ChallengeSet<R>, const C: usize>(
+    comp: &LFComp<R, C>,
+) -> Result<LCCCS<C, R>> {
     // Linearize provided CCCS
-    Ok(LFLinearizationProver::<_, TS>::prove(
+    Ok(LFLinearizationProver::<_, TS<R, CS>>::prove(
         &comp.cccs,
         &comp.witness,
-        &mut TS::default(),
+        &mut TS::<R, CS>::default(),
         &comp.ccs,
     )?
     .0)
@@ -158,6 +160,7 @@ fn linearize<const C: usize>(comp: &LFComp<C>) -> Result<LCCCS<C, RqNTT>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cyclotomic_rings::{rings::FrogChallengeSet as CS, rings::FrogRingNTT as RqNTT};
     use latticefold::arith::{
         Arith, ccs::get_test_dummy_degree_three_ccs_non_scalar, r1cs::get_test_dummy_z_split_ntt,
     };
@@ -167,21 +170,21 @@ mod tests {
     const WIT_LEN: usize = 8;
     const X_LEN: usize = 1;
 
-    fn dummy_comp(ajtai: &Ajtai<C, W>) -> LFComp<C> {
+    fn dummy_comp<R: SuitableRing>(ajtai: &Ajtai<R, C, W>) -> LFComp<R, C> {
         let r1cs_rows = X_LEN + WIT_LEN + 1;
 
-        let (one, x_ccs, w_ccs) = get_test_dummy_z_split_ntt::<RqNTT, X_LEN, WIT_LEN>();
+        let (one, x_ccs, w_ccs) = get_test_dummy_z_split_ntt::<R, X_LEN, WIT_LEN>();
         let mut z = vec![one];
         z.extend(&x_ccs);
         z.extend(&w_ccs);
-        let ccs = get_test_dummy_degree_three_ccs_non_scalar::<RqNTT, X_LEN, WIT_LEN, W>(
+        let ccs = get_test_dummy_degree_three_ccs_non_scalar::<R, X_LEN, WIT_LEN, W>(
             &z,
             DP::L,
             r1cs_rows,
         );
         ccs.check_relation(&z).expect("R1CS invalid!");
 
-        let wit: Witness<RqNTT> = Witness::from_w_ccs::<DP>(w_ccs);
+        let wit: Witness<R> = Witness::from_w_ccs::<DP>(w_ccs);
         let cm_i = CCCS {
             cm: wit.commit::<C, W, DP>(ajtai).unwrap(),
             x_ccs,
@@ -199,8 +202,8 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let scheme = Ajtai::rand(&mut rng);
-        let comp0 = dummy_comp(&scheme);
-        LFAcc::init(scheme, &comp0)?;
+        let comp0 = dummy_comp::<RqNTT>(&scheme);
+        LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0)?;
 
         Ok(())
     }
@@ -209,9 +212,9 @@ mod tests {
     fn test_multifold() -> Result<()> {
         let mut rng = rand::thread_rng();
 
-        let scheme = Ajtai::rand(&mut rng);
+        let scheme = Ajtai::<RqNTT, C, W>::rand(&mut rng);
         let comp0 = dummy_comp(&scheme);
-        let mut agg = LFAcc::init(scheme, &comp0)?.0;
+        let mut agg = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0)?.0;
 
         let comp1 = dummy_comp(agg.ajtai());
         agg.fold(&comp1)?;
@@ -223,10 +226,10 @@ mod tests {
     fn test_multifold_verify() -> Result<()> {
         let mut rng = rand::thread_rng();
 
-        let scheme = Ajtai::rand(&mut rng);
+        let scheme = Ajtai::<RqNTT, C, W>::rand(&mut rng);
         let comp0 = dummy_comp(&scheme);
-        let (mut agg, proof) = LFAcc::init(scheme.clone(), &comp0)?;
-        let mut ctx = LFVerifier::init(&comp0, &proof)?;
+        let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme.clone(), &comp0)?;
+        let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof)?;
 
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai());
