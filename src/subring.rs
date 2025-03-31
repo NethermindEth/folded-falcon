@@ -85,6 +85,10 @@ impl<S: PolyRing> SplitRingPoly<S> {
     pub fn into_vec(self) -> Vec<S> {
         self.0
     }
+
+    pub fn splits(&self) -> &[S] {
+        &self.0
+    }
 }
 
 impl<U: SuitableRing> SplitRing<U> {
