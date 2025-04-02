@@ -57,7 +57,7 @@ mod tests {
             RqNTT::from(2u32),
             RqNTT::from(6u32),
         ];
-        let ccs = CCS::from_r1cs_padded(r1cs::signature_verification_r1cs(), 2, DP::L);
+        let ccs = CCS::from_r1cs_padded(r1cs::signature_verification_cs().to_r1cs(), 2, DP::L);
         ccs.check_relation(z).expect("R1CS invalid!");
 
         let wit: Witness<RqNTT> = Witness::from_w_ccs::<DP>(vec![
