@@ -16,13 +16,13 @@ impl<R: SuitableRing> CSRing for R {
     type Base = R;
 }
 
-//pub struct Input<R: CSRing> {
-//    pub name: String,
-//    pub r: R,
-//    pub ty: InputType,
-//}
-//
-//pub enum InputType { Public, Private }
+#[derive(Clone, Copy, Debug)]
+pub enum Input {
+    /// Public input (x)
+    Public,
+    /// Witness (w)
+    Private,
+}
 
 /// Combine several constraint systems into a single R1CS instance
 pub struct R1CSBuilder<R: CSRing> {
@@ -139,54 +139,81 @@ pub fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
     cs
 }
 
-pub fn splitring_mul_r1cs<R: SuitableRing>(k: usize) -> R1CS<R> {
+/// Multiplication constraint system for two [`SplitRing`]: `s * s' = t`
+/// `k` is the number of splits
+pub fn splitring_mul_cs<R: SuitableRing>(
+    s: Input,
+    sp: Input,
+    t: Input,
+    k: usize,
+) -> ConstraintSystem<R> {
     let mut cs = ConstraintSystem::<R>::new();
 
-    // Variables:
-    // 0..k-1: input s = [s_i]
-    // k..2k-1: input s' = [s_j]
-    // 2k: constant 1 (auxiliary input)
-    // 2k+1..2k+k*k: auxiliary variables for cross-multiplications s_i*s_j
-    // 2k+k*k+1..2k+k*k+k: output t_l
-    cs.ninputs = 2 * k; // input polynomials s, s'
-    cs.nauxs = k * k + k + 1; // k*k for cross-multiplications + k for outputs + constant 1
+    // Variables (one witness ring):
+    // 0..k: public ring
+    // k..2k: public ring
+    // 2k: constant 1
+    // 2k+1..3k+1: private ring
+    // 3k+1..3k+1+k*k: auxiliary variables for cross-multiplications
+
+    // Variables (two witness rings):
+    // 0..k: public ring
+    // k: constant 1
+    // k+1..2k+1: private ring
+    // 2k+1..3k+1: private ring
+    // 3k+1..3k+1+k*k: auxiliary variables for cross-multiplications
+
+    let (s_index, sp_index, t_index, one_index) = match (s, sp, t) {
+        (Input::Public, Input::Public, Input::Private) => (0, k, 2 * k + 1, 2 * k),
+        (Input::Private, Input::Private, Input::Public) => (k + 1, 2 * k + 1, 0, k),
+        (Input::Public, Input::Private, Input::Public)
+        | (Input::Private, Input::Public, Input::Public) => (0, 2 * k + 1, k, 2 * k),
+        (Input::Public, Input::Private, Input::Private)
+        | (Input::Private, Input::Public, Input::Private) => (0, k + 1, 2 * k + 1, k),
+        _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
+    };
+
+    let nvars = k + k + k + 1 + k * k;
+    let aux_index = 3 * k + 1;
+    cs.ninputs = one_index;
+    cs.nauxs = nvars - one_index;
 
     // For each t_l
     for l in 0..k {
-        // Multiplication constraints for each s_i*s_j
+        // Multiplication constraints for each s_i*s'_j
         for i in 0..k {
             for j in 0..k {
                 if (i + j) % k == l {
-                    let aux_idx = 2 * k + 1 + i * k + j;
-                    let a = LinearCombination::single_term(1u64, i);
-                    let b = LinearCombination::single_term(1u64, k + j);
+                    let aux_idx = aux_index + i * k + j;
+                    let a = LinearCombination::single_term(1u64, s_index + i);
+                    let b = LinearCombination::single_term(1u64, sp_index + j);
                     let c = LinearCombination::single_term(1u64, aux_idx);
                     cs.add_constraint(Constraint::new(a, b, c));
                 }
             }
         }
 
-        // Addition constraint for the sum of s_i*s_j which composes t_l
+        // Addition constraint for the sum of s_i*s'_j which composes t_l
         let mut sum_terms = Vec::new();
         for i in 0..k {
             for j in 0..k {
                 if (i + j) % k == l {
-                    let aux_idx = 2 * k + 1 + i * k + j;
+                    let aux_idx = aux_index + i * k + j;
                     sum_terms.push((1u64.into(), aux_idx));
                 }
             }
         }
         let sum = LinearCombination::new().add_terms(&sum_terms);
-        let output = LinearCombination::single_term(1u64, 2 * k + k * k + 1 + l);
+        let output = LinearCombination::single_term(1u64, t_index + l);
         // sum * 1 = output
         cs.add_constraint(Constraint::new(
             sum,
-            LinearCombination::single_term(1u64, 2 * k),
+            LinearCombination::single_term(1u64, one_index),
             output,
         ));
     }
 
-    cs.to_r1cs()
+    cs
 }
 
 /// R1CS with l2- norm calculation, norm bound constraints, for some poly of degree `d`.
@@ -298,12 +325,9 @@ mod tests {
         r1cs.check_relation(z).unwrap();
     }
 
-    #[test]
-    fn test_r1cs_splitring_mul() {
-        // Falcon degree = 512, Frog ring of degree 16
-        let k = 32; // n subrings
-        let r1cs = splitring_mul_r1cs(k);
-
+    fn splitring_mul_setup(
+        k: usize,
+    ) -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>, Vec<RqNTT>) {
         // 5X^10 * 5X^10 = 25X^20
         let mut a_r = vec![0u128; 512];
         a_r[10] = 5;
@@ -314,43 +338,119 @@ mod tests {
         let b: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&b_r).crt();
         let c: SplitRing<RqNTT> = a.clone() * b.clone();
 
-        // Witness vector
-        let z = {
-            let mut z = Vec::with_capacity(2 * k + k * k + k + 1); // inputs + constant 1 + aux + output
+        // cross-multiplication terms s_i*s'_j
+        let mut aux = vec![RqNTT::from(0u32); k * k];
+        for i in 0..k {
+            for j in 0..k {
+                let aux_idx = i * k + j;
+                aux[aux_idx] = a[i] * b[j];
+            }
+        }
 
-            // input polys
-            z.extend(a.splits());
-            z.extend(b.splits());
-
-            // constant 1
-            z.push(RqNTT::from(1u32));
-
-            // cross-multiplication terms s_i*s_j
-            let mut aux_vars = vec![RqNTT::from(0u32); k * k];
+        // output poly t = [t_l]
+        let mut t = vec![RqNTT::from(0u32); k];
+        for (l, tl) in t.iter_mut().enumerate() {
             for i in 0..k {
                 for j in 0..k {
-                    let aux_idx = i * k + j;
-                    aux_vars[aux_idx] = a[i] * b[j];
-                }
-            }
-            z.extend(aux_vars.clone());
-
-            // output poly t = [t_l]
-            let mut t = vec![RqNTT::from(0u32); k];
-            for (l, tl) in t.iter_mut().enumerate() {
-                for i in 0..k {
-                    for j in 0..k {
-                        if (i + j) % k == l {
-                            *tl += aux_vars[i * k + j];
-                        }
+                    if (i + j) % k == l {
+                        *tl += aux[i * k + j];
                     }
                 }
             }
-            assert_eq!(t, c.splits()); // assert summation
-            z.extend(t);
+        }
+        assert_eq!(t, c.splits()); // assert summation
 
-            z
-        };
+        (a, b, t, aux)
+    }
+
+    #[test]
+    fn test_r1cs_splitring_mul_ppw() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = splitring_mul_cs(Input::Public, Input::Public, Input::Private, k).to_r1cs();
+        let (a, b, t, aux) = splitring_mul_setup(k);
+        let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
+
+        // public inputs s, s'
+        z.extend(a.splits());
+        z.extend(b.splits());
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness (mul result)
+        z.extend(t);
+
+        z.extend(aux);
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_mul_wwp() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = splitring_mul_cs(Input::Private, Input::Private, Input::Public, k).to_r1cs();
+        let (a, b, t, aux) = splitring_mul_setup(k);
+        let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
+
+        // public input (mul result)
+        z.extend(t);
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s, s'
+        z.extend(a.splits());
+        z.extend(b.splits());
+
+        z.extend(aux);
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_mul_wpp() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = splitring_mul_cs(Input::Private, Input::Public, Input::Public, k).to_r1cs();
+        let (a, b, t, aux) = splitring_mul_setup(k);
+        let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
+
+        // public inputs (s', mul result)
+        z.extend(b.splits());
+        z.extend(t);
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s
+        z.extend(a.splits());
+
+        z.extend(aux);
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_mul_wpw() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = splitring_mul_cs(Input::Private, Input::Public, Input::Private, k).to_r1cs();
+        let (a, b, t, aux) = splitring_mul_setup(k);
+        let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
+
+        // public inputs s'
+        z.extend(b.splits());
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s, mul result
+        z.extend(a.splits());
+        z.extend(t);
+
+        z.extend(aux);
 
         r1cs.check_relation(&z).unwrap();
     }
