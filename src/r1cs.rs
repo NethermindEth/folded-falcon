@@ -98,8 +98,29 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
 impl<R: SuitableRing> CSRing for R {
     type Base = R;
 
-    fn cs_mul(_s: Input, _sp: Input, _t: Input, _k: usize) -> ConstraintSystem<R> {
-        todo!()
+    fn cs_mul(s: Input, sp: Input, t: Input, _k: usize) -> ConstraintSystem<R> {
+        let mut cs = ConstraintSystem::<R>::new();
+
+        let (s_index, sp_index, t_index, one_index) = match (s, sp, t) {
+            (Input::Public, Input::Public, Input::Private) => (0, 1, 3, 2),
+            (Input::Private, Input::Private, Input::Public) => (2, 3, 0, 1),
+            (Input::Public, Input::Private, Input::Public)
+            | (Input::Private, Input::Public, Input::Public) => (3, 0, 1, 2),
+            (Input::Public, Input::Private, Input::Private)
+            | (Input::Private, Input::Public, Input::Private) => (2, 0, 3, 1),
+            _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
+        };
+
+        let nvars = 4;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
+
+        let a = LinearCombination::single_term(1u64, s_index);
+        let b = LinearCombination::single_term(1u64, sp_index);
+        let c = LinearCombination::single_term(1u64, t_index);
+        cs.add_constraint(Constraint::new(a, b, c));
+
+        cs
     }
 
     fn cs_norm_bound(d: usize, log_bound: usize) -> ConstraintSystem<R> {
@@ -291,6 +312,58 @@ mod tests {
     use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
     use rand::Rng;
     use stark_rings::PolyRing;
+
+    #[test]
+    fn test_r1cs_ring_mul_ppw() {
+        let r1cs = RqNTT::cs_mul(Input::Public, Input::Public, Input::Private, 0).to_r1cs();
+        // 2*3 = 6
+        let z = &[
+            RqNTT::from(2u32),
+            RqNTT::from(3u32),
+            RqNTT::from(1u32),
+            RqNTT::from(6u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_mul_wwp() {
+        let r1cs = RqNTT::cs_mul(Input::Private, Input::Private, Input::Public, 0).to_r1cs();
+        // 2*3 = 6
+        let z = &[
+            RqNTT::from(6u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+            RqNTT::from(3u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_mul_wpw() {
+        let r1cs = RqNTT::cs_mul(Input::Private, Input::Public, Input::Private, 0).to_r1cs();
+        // 2*3 = 6
+        let z = &[
+            RqNTT::from(3u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+            RqNTT::from(6u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_mul_wpp() {
+        let r1cs = RqNTT::cs_mul(Input::Private, Input::Public, Input::Public, 0).to_r1cs();
+        // 2*3 = 6
+        let z = &[
+            RqNTT::from(3u32),
+            RqNTT::from(6u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
 
     #[test]
     fn test_r1cs_signature_verification() {
