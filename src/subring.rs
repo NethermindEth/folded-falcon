@@ -14,6 +14,8 @@ pub struct SplitRingPoly<S: PolyRing>(Vec<S>);
 
 /// A ring R's decomposed representation into subrings S. Elements are in NTT form, employable in
 /// LatticeFold.
+/// This ring representation does not implement `SuitableRing` as some of the traits required do
+/// not particularly fit the vector of NTT representations structure, e.g., `PolyRing`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SplitRing<U: SuitableRing>(Vec<U>);
 

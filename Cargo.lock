@@ -358,6 +358,7 @@ dependencies = [
  "num-traits",
  "rand",
  "stark-rings",
+ "stark-rings-linalg",
 ]
 
 [[package]]
