@@ -90,8 +90,8 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
         cs
     }
 
-    fn cs_norm_bound(_d: usize, _log_bound: usize) -> ConstraintSystem<Self::Base> {
-        todo!()
+    fn cs_norm_bound(d: usize, log_bound: usize) -> ConstraintSystem<Self::Base> {
+        <Self::Base as CSRing>::cs_norm_bound(d, log_bound)
     }
 }
 
@@ -547,21 +547,74 @@ mod tests {
         assert!(norm < (1u128 << bound));
 
         let mut z = Vec::with_capacity(d + 2 + bound);
+
         z.extend(
             a_r.iter()
                 .map(|&x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(x))),
         ); // coeffs
+
         z.push(RqNTT::from(1u32)); // constant 1
+
         a_r.iter().for_each(|coeff| {
             z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
                 coeff * coeff,
             )))
         }); // squared coeffs
+
         z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
             norm,
         ))); // squared norm
 
         // Norm binary decomposition
+        let mut remaining = norm;
+        for i in 0..bound {
+            let bit = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+            z.push(bit);
+        }
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_norm_bound() {
+        let mut rng = rand::thread_rng();
+        let bound = 16; // 2^16
+        let d = 512;
+        let r1cs = SplitRing::<RqNTT>::cs_norm_bound(d, bound).to_r1cs();
+
+        let a_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+
+        let norm: u128 = a_r.iter().map(|x| x * x).sum();
+        assert!(norm < (1u128 << bound));
+
+        let mut z = Vec::with_capacity(d + 2 + bound);
+
+        // public input poly
+        z.extend(
+            a_r.iter()
+                .map(|&x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(x))),
+        );
+
+        // one
+        z.push(RqNTT::from(1u32));
+
+        // aux: c_i * c_i
+        a_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )))
+        });
+
+        // squared norm
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm,
+        )));
+
         let mut remaining = norm;
         for i in 0..bound {
             let bit = if (remaining & (1 << i)) != 0 {
