@@ -189,8 +189,27 @@ impl<U: SuitableRing> MulAssign for SplitRing<U> {
 
 impl<U: SuitableRing> std::ops::Index<usize> for SplitRing<U> {
     type Output = U;
+
     fn index(&self, index: usize) -> &U {
         &self.0[index]
+    }
+}
+
+impl<U: SuitableRing> AddAssign for SplitRing<U> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0
+            .iter_mut()
+            .zip(rhs.0.iter())
+            .for_each(|(a_i, b_i)| *a_i += b_i);
+    }
+}
+
+impl<U: SuitableRing> Add for SplitRing<U> {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        self += rhs;
+        self
     }
 }
 
@@ -310,25 +329,47 @@ mod tests {
 
     #[test]
     fn test_subring_mul_ntt_1() {
-        // 5X^10 * 10X^20
+        // 5X^10 * 5X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
         let mut r2 = vec![0u128; 512];
-        r2[20] = 10;
+        r2[10] = 5;
 
-        // 5X^10 -> s_10 = 5
-        let u1: SplitRing<NTT> = SplitRingPoly::<Poly>::from_r(&r1).crt();
-        // 10X^20 -> s_4 = 10x
-        let u2: SplitRing<NTT> = SplitRingPoly::<Poly>::from_r(&r2).crt();
+        let s1: SplitRingPoly<Poly> = SplitRingPoly::from_r(&r1);
+        let s2: SplitRingPoly<Poly> = SplitRingPoly::from_r(&r2);
 
-        // multiply using NTT
-        let um = u1 * u2;
-        let sm = um.icrt();
+        let s1_ntt: SplitRing<NTT> = s1.crt();
+        let s2_ntt: SplitRing<NTT> = s2.crt();
+
+        let sm_ntt = s1_ntt * s2_ntt;
+        let sm = sm_ntt.icrt();
         let rm = sm.recompose();
 
         let mut expected = vec![0u128; 512];
-        // 50X^30
-        expected[30] = 50;
+        // 25X^20
+        expected[20] = 25;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_add() {
+        // 5X^10 + 3X^10
+        let mut r1 = vec![0u128; 512];
+        r1[10] = 5;
+        let mut r2 = vec![0u128; 512];
+        r2[10] = 3;
+
+        let s1: SplitRing<NTT> = SplitRingPoly::from_r(&r1).crt();
+        let s2: SplitRing<NTT> = SplitRingPoly::from_r(&r2).crt();
+
+        let sm_ntt = s1 + s2;
+        let sm = sm_ntt.icrt();
+        let rm = sm.recompose();
+
+        let mut expected = vec![0u128; 512];
+        // 8X^10
+        expected[10] = 8;
 
         assert_eq!(rm, expected);
     }
