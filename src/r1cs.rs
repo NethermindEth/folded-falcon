@@ -102,7 +102,7 @@ pub fn ring_norm_bound_r1cs<R: SuitableRing>(d: usize, log_bound: usize) -> R1CS
     }
 
     // Sum all squared terms
-    let mut sum_terms = Vec::new();
+    let mut sum_terms = Vec::with_capacity(d);
     for i in 0..d {
         sum_terms.push((1u64.into(), d + 1 + i));
     }
@@ -123,7 +123,7 @@ pub fn ring_norm_bound_r1cs<R: SuitableRing>(d: usize, log_bound: usize) -> R1CS
     }
 
     // Enforce that the sum equals the binary decomposition
-    let mut binary_terms: Vec<(R, usize)> = Vec::new();
+    let mut binary_terms: Vec<(R, usize)> = Vec::with_capacity(log_bound);
     for i in 0..log_bound {
         binary_terms.push(((1u64 << i).into(), 2 * d + 2 + i));
     }
