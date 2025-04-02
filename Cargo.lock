@@ -350,6 +350,7 @@ name = "folded-falcon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-ff",
  "cyclotomic-rings",
  "falcon-rust",
  "latticefold",

@@ -6,6 +6,8 @@ mod subring;
 pub use lfold::{LFAcc, LFComp, LFVerifier};
 pub use subring::{SplitRing, SplitRingPoly};
 
+pub const FALCON_MOD: u128 = 12289;
+
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
 pub struct FalconSig {

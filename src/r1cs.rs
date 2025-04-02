@@ -78,11 +78,74 @@ pub fn splitring_mul_r1cs<R: SuitableRing>(k: usize) -> R1CS<R> {
     cs.to_r1cs()
 }
 
+/// R1CS with l2- norm calculation, norm bound constraints, for some poly of degree `d`.
+/// `log_bound` must be the log2 of the norm bound. Only powers of 2 bounds are currently supported.
+/// The norm is constrained to be representable with only `log_bound` bits.
+pub fn ring_norm_bound_r1cs<R: SuitableRing>(d: usize, log_bound: usize) -> R1CS<R> {
+    let mut cs = ConstraintSystem::<R>::new();
+
+    // Variables:
+    // 0..d: input c = [c_i] (coefficients)
+    // d: constant 1 (auxiliary input)
+    // d+1..2d: auxiliary variables for c_i * c_i (squared coeffs)
+    // 2d+1: auxiliary variable for sum of squares
+    // 2d+2..2d+2+log2(bound): binary decomposition of sum
+    cs.ninputs = d; // input polynomial coefficients
+    cs.nauxs = d + 2 + log_bound; // d for squares + sum + binary decomposition
+
+    // For each coefficient c_i, compute c_i * c_i
+    for i in 0..d {
+        let a = LinearCombination::single_term(1u64, i); // c_i
+        let b = LinearCombination::single_term(1u64, i); // c_i
+        let c = LinearCombination::single_term(1u64, d + 1 + i); // c_i * c_i
+        cs.add_constraint(Constraint::new(a, b, c));
+    }
+
+    // Sum all squared terms
+    let mut sum_terms = Vec::new();
+    for i in 0..d {
+        sum_terms.push((1u64.into(), d + 1 + i));
+    }
+    let sum = LinearCombination::new().add_terms(&sum_terms);
+    let output = LinearCombination::single_term(1u64, 2 * d + 1);
+    // sum * 1 = output
+    cs.add_constraint(Constraint::new(
+        sum,
+        LinearCombination::single_term(1u64, d),
+        output,
+    ));
+
+    // Binary decomposition of the sum
+    // Each bit must be 0 or 1 (bit * bit = bit)
+    for i in 0..log_bound {
+        let bit = LinearCombination::single_term(1u64, 2 * d + 2 + i);
+        cs.add_constraint(Constraint::new(bit.clone(), bit.clone(), bit));
+    }
+
+    // Enforce that the sum equals the binary decomposition
+    let mut binary_terms: Vec<(R, usize)> = Vec::new();
+    for i in 0..log_bound {
+        binary_terms.push(((1u64 << i).into(), 2 * d + 2 + i));
+    }
+    let binary_sum = LinearCombination::new().add_terms(&binary_terms);
+
+    // sum = binary_sum
+    cs.add_constraint(Constraint::new(
+        LinearCombination::single_term(1u64, 2 * d + 1),
+        LinearCombination::single_term(1u64, d),
+        binary_sum,
+    ));
+
+    cs.to_r1cs()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{SplitRing, SplitRingPoly};
     use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
+    use rand::Rng;
+    use stark_rings::PolyRing;
 
     #[test]
     fn test_r1cs_signature_verification() {
@@ -152,6 +215,47 @@ mod tests {
 
             z
         };
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_norm_bound() {
+        let mut rng = rand::thread_rng();
+        let bound = 16; // 2^16
+        let d = 512;
+        let r1cs = ring_norm_bound_r1cs(d, bound);
+
+        let a_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+        let norm: u128 = a_r.iter().map(|x| x * x).sum();
+        assert!(norm < (1u128 << bound));
+
+        let mut z = Vec::with_capacity(d + 2 + bound);
+        z.extend(
+            a_r.iter()
+                .map(|&x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(x))),
+        ); // coeffs
+        z.push(RqNTT::from(1u32)); // constant 1
+        a_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )))
+        }); // squared coeffs
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm,
+        ))); // squared norm
+
+        // Norm binary decomposition
+        let mut remaining = norm;
+        for i in 0..bound {
+            let bit = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+            z.push(bit);
+        }
 
         r1cs.check_relation(&z).unwrap();
     }
