@@ -65,6 +65,7 @@ pub fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
 
     #[test]
@@ -83,27 +84,27 @@ mod tests {
     }
 
     #[test]
-    fn test_r1cs_signature_verification_w_bound() {
+    fn test_r1cs_signature_verification_w_bound() -> Result<()> {
         // 1 + 2*3 = 7
         // ||2||^2 = 4 < 2^4
         let (r1cs, map) = signature_verification_r1cs::<RqNTT>(0);
 
-        let nvars = map.vars().len() + 1 + 3;
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("h", &[3u32.into()])?
+            .set("c", &[7u32.into()])?
+            .set("s1", &[1u32.into()])?
+            .set("s2", &[2u32.into()])?
+            .set("s2h", &[6u32.into()])?
+            .set("s2*s2", &[4u32.into()])?
+            .set("||s2||^2", &[4u32.into()])?
+            .set(
+                "s2 decomp",
+                &[0u32.into(), 0u32.into(), 1u32.into(), 0u32.into()],
+            )?
+            .build();
 
-        let mut z = vec![RqNTT::from(0u32); nvars];
-        z[map.get("h").unwrap().0] = RqNTT::from(3u32);
-        z[map.get("c").unwrap().0] = RqNTT::from(7u32);
-        z[map.get("s1").unwrap().0] = RqNTT::from(1u32);
-        z[map.get("s2").unwrap().0] = RqNTT::from(2u32);
-        z[map.get("s2h").unwrap().0] = RqNTT::from(6u32);
-        z[map.get("s2*s2").unwrap().0] = RqNTT::from(4u32);
-        z[map.get("||s2||^2").unwrap().0] = RqNTT::from(4u32);
-        z[map.get("s2 decomp").unwrap().0] = RqNTT::from(0u32);
-        z[map.get("s2 decomp").unwrap().0 + 1] = RqNTT::from(0u32);
-        z[map.get("s2 decomp").unwrap().0 + 2] = RqNTT::from(1u32);
-        z[map.get("s2 decomp").unwrap().0 + 3] = RqNTT::from(0u32);
-        z[map.get_one()] = RqNTT::from(1u32);
+        r1cs.check_relation(&z)?;
 
-        r1cs.check_relation(&z).unwrap();
+        Ok(())
     }
 }
