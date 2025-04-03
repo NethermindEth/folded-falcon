@@ -10,11 +10,21 @@ use latticefold::arith::r1cs::{Constraint, ConstraintSystem, LinearCombination, 
 pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> R1CS<R::Base> {
     let mut builder = R1CSBuilder::<R>::new();
     // s2*h
-    let s2h = R::cs_mul(Input::Private, Input::Public, Input::Private, k);
+    let s2h = R::cs_mul(
+        Input::private("s2"),
+        Input::public("h"),
+        Input::private("s2h"),
+        k,
+    );
     // s1 + s2h = c
-    let fin = R::cs_add(Input::Private, Input::Private, Input::Public, k);
+    let fin = R::cs_add(
+        Input::private("s1"),
+        Input::private("s2h"),
+        Input::public("c"),
+        k,
+    );
     // norm bound
-    let norm_bound = R::cs_norm_bound(1, 4);
+    let norm_bound = R::cs_norm_bound(Input::private("s2"), 1, 4);
 
     builder.push(s2h);
     builder.push(fin);
