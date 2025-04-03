@@ -154,7 +154,7 @@ impl<R: SuitableRing> CSRing for R {
             | (Input::Private, Input::Public, Input::Public) => (3, 0, 1, 2),
             (Input::Public, Input::Private, Input::Private)
             | (Input::Private, Input::Public, Input::Private) => (2, 0, 3, 1),
-            _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
+            _ => panic!("{s:?} + {sp:?} = {t:?} relation not supported"),
         };
 
         let nvars = 4;
@@ -351,6 +351,22 @@ impl<R: CSRing> Default for R1CSBuilder<R> {
     }
 }
 
+pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> R1CS<R::Base> {
+    let mut builder = R1CSBuilder::<R>::new();
+    // s2*h
+    let s2h = R::cs_mul(Input::Private, Input::Public, Input::Private, k);
+    // s1 + s2h = c
+    let fin = R::cs_add(Input::Private, Input::Private, Input::Public, k);
+    // norm bound
+    let norm_bound = R::cs_norm_bound(1, 4);
+
+    builder.push(s2h);
+    builder.push(fin);
+    builder.push(norm_bound);
+
+    builder.build()
+}
+
 pub fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
     // s1 + s2*h = c
     let mut cs = ConstraintSystem::<R>::new();
@@ -385,6 +401,42 @@ mod tests {
     use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
     use rand::Rng;
     use stark_rings::PolyRing;
+
+    #[test]
+    fn test_r1cs_signature_verification_full() {
+        // 1 + 2*3 = 7
+        let r1cs = signature_verification_r1cs::<RqNTT>(0);
+        // Variables
+        // 0: h = 3
+        // 1: c = 7
+        // 2: s2 (norm) = 2
+        // 3: 1
+        // 4: s2 = 2
+        // 5: s2*h = 6
+        // 6: s1 = 1
+        // 7: s2*h = 6
+        // 8: s2 (norm) ^ 2 =  4
+        // 9: norm = 4
+        // 10..14 = binary decomp
+        let z = &[
+            RqNTT::from(3u32), // h
+            RqNTT::from(7u32), // c
+            RqNTT::from(2u32), // s2 [coeffs]
+            RqNTT::from(1u32),
+            RqNTT::from(2u32), // s2
+            RqNTT::from(6u32), // s2*h
+            RqNTT::from(1u32), // s1
+            RqNTT::from(6u32), // s2*h
+            RqNTT::from(4u32), // s2 [coeffs]^2
+            RqNTT::from(4u32), // norm^2
+            // binary decomp
+            RqNTT::from(0u32),
+            RqNTT::from(0u32),
+            RqNTT::from(1u32),
+            RqNTT::from(0u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
 
     #[test]
     fn test_r1cs_ring_mul_ppw() {
