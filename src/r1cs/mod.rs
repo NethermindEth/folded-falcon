@@ -5,9 +5,11 @@ pub use builder::R1CSBuilder;
 pub use ops::{CSRing, Input};
 
 use cyclotomic_rings::rings::SuitableRing;
-use latticefold::arith::r1cs::{Constraint, ConstraintSystem, LinearCombination, R1CS};
+use latticefold::arith::r1cs::{
+    Constraint, ConstraintSystem, LinearCombination, R1CS, VariableMap,
+};
 
-pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> R1CS<R::Base> {
+pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> (R1CS<R::Base>, VariableMap) {
     let mut builder = R1CSBuilder::<R>::new();
     // s2*h
     let s2h = R::cs_mul(
@@ -83,36 +85,25 @@ mod tests {
     #[test]
     fn test_r1cs_signature_verification_w_bound() {
         // 1 + 2*3 = 7
-        let r1cs = signature_verification_r1cs::<RqNTT>(0);
-        // Variables
-        // 0: h = 3
-        // 1: c = 7
-        // 2: s2 (norm) = 2
-        // 3: 1
-        // 4: s2 = 2
-        // 5: s2*h = 6
-        // 6: s1 = 1
-        // 7: s2*h = 6
-        // 8: s2 (norm) ^ 2 =  4
-        // 9: norm = 4
-        // 10..14 = binary decomp
-        let z = &[
-            RqNTT::from(3u32), // h
-            RqNTT::from(7u32), // c
-            RqNTT::from(2u32), // s2 [coeffs]
-            RqNTT::from(1u32),
-            RqNTT::from(2u32), // s2
-            RqNTT::from(6u32), // s2*h
-            RqNTT::from(1u32), // s1
-            RqNTT::from(6u32), // s2*h
-            RqNTT::from(4u32), // s2 [coeffs]^2
-            RqNTT::from(4u32), // norm^2
-            // binary decomp
-            RqNTT::from(0u32),
-            RqNTT::from(0u32),
-            RqNTT::from(1u32),
-            RqNTT::from(0u32),
-        ];
-        r1cs.check_relation(z).unwrap();
+        // ||2||^2 = 4 < 2^4
+        let (r1cs, map) = signature_verification_r1cs::<RqNTT>(0);
+
+        let nvars = map.vars().len() + 1 + 3;
+
+        let mut z = vec![RqNTT::from(0u32); nvars];
+        z[map.get("h").unwrap().0] = RqNTT::from(3u32);
+        z[map.get("c").unwrap().0] = RqNTT::from(7u32);
+        z[map.get("s1").unwrap().0] = RqNTT::from(1u32);
+        z[map.get("s2").unwrap().0] = RqNTT::from(2u32);
+        z[map.get("s2h").unwrap().0] = RqNTT::from(6u32);
+        z[map.get("s2*s2").unwrap().0] = RqNTT::from(4u32);
+        z[map.get("||s2||^2").unwrap().0] = RqNTT::from(4u32);
+        z[map.get("s2 decomp").unwrap().0] = RqNTT::from(0u32);
+        z[map.get("s2 decomp").unwrap().0 + 1] = RqNTT::from(0u32);
+        z[map.get("s2 decomp").unwrap().0 + 2] = RqNTT::from(1u32);
+        z[map.get("s2 decomp").unwrap().0 + 3] = RqNTT::from(0u32);
+        z[map.get_one()] = RqNTT::from(1u32);
+
+        r1cs.check_relation(&z).unwrap();
     }
 }
