@@ -184,6 +184,8 @@ pub enum ZBuildError {
     AlreadySet(String),
     #[error("variable {0} not found")]
     NotFound(String),
+    #[error("some variables not set: {0:?}")]
+    VariablesNotSet(Vec<String>),
 }
 
 impl<R: CSRing> ZBuilder<R> {
@@ -209,6 +211,7 @@ impl<R: CSRing> ZBuilder<R> {
             if len != val.len() {
                 return Err(ZBuildError::LengthMismatch(name.into(), val.len(), len));
             }
+            self.set.insert(name.into());
             self.z[index..index + len].copy_from_slice(val);
         } else {
             return Err(ZBuildError::NotFound(name.into()));
@@ -218,9 +221,18 @@ impl<R: CSRing> ZBuilder<R> {
 
     /// Fetch the currently built `z` vector. This `ZBuilder` instance can then be reused to build
     /// another `z`.
-    pub fn build(&mut self) -> Vec<R::Base> {
+    pub fn build(&mut self) -> Result<Vec<R::Base>, ZBuildError> {
+        let unset = self
+            .map
+            .vars()
+            .filter(|(name, _)| !self.set.contains(name.as_str()))
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        if !unset.is_empty() {
+            return Err(ZBuildError::VariablesNotSet(unset));
+        }
         self.set.clear();
-        std::mem::take(&mut self.z)
+        Ok(std::mem::take(&mut self.z))
     }
 }
 
@@ -231,7 +243,7 @@ mod tests {
     use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abc_uvw() -> Result<()> {
+    fn test_r1cs_builder_ring_mul_double_abc_uvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -256,15 +268,15 @@ mod tests {
             .set("u", &[5u32.into()])?
             .set("v", &[10u32.into()])?
             .set("w", &[50u32.into()])?
-            .build();
+            .build()?;
 
-        r1cs.check_relation(&z).unwrap();
+        r1cs.check_relation(&z)?;
 
         Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abc_avw() -> Result<()> {
+    fn test_r1cs_builder_ring_mul_double_abc_avw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -286,15 +298,15 @@ mod tests {
             .set("c", &[6u32.into()])?
             .set("v", &[10u32.into()])?
             .set("w", &[20u32.into()])?
-            .build();
+            .build()?;
 
-        r1cs.check_relation(&z).unwrap();
+        r1cs.check_relation(&z)?;
 
         Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abf_fvw() -> Result<()> {
+    fn test_r1cs_builder_ring_mul_double_abf_fvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -316,15 +328,15 @@ mod tests {
             .set("f", &[6u32.into()])?
             .set("v", &[10u32.into()])?
             .set("w", &[60u32.into()])?
-            .build();
+            .build()?;
 
-        r1cs.check_relation(&z).unwrap();
+        r1cs.check_relation(&z)?;
 
         Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_pabf_fvw() -> Result<()> {
+    fn test_r1cs_builder_ring_mul_double_pabf_fvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::private("a"),
@@ -346,9 +358,9 @@ mod tests {
             .set("f", &[6u32.into()])?
             .set("v", &[10u32.into()])?
             .set("w", &[60u32.into()])?
-            .build();
+            .build()?;
 
-        r1cs.check_relation(&z).unwrap();
+        r1cs.check_relation(&z)?;
 
         Ok(())
     }

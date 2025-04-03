@@ -101,7 +101,7 @@ mod tests {
                 "s2 decomp",
                 &[0u32.into(), 0u32.into(), 1u32.into(), 0u32.into()],
             )?
-            .build();
+            .build()?;
 
         r1cs.check_relation(&z)?;
 
