@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "cyclotomic-rings"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#035c0424485f2b1a90b6cdff85b58bf5fcd2e33a"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#0aa25fbb2824c9737e410208560516aca62bf031"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -359,6 +359,7 @@ dependencies = [
  "rand",
  "stark-rings",
  "stark-rings-linalg",
+ "thiserror",
 ]
 
 [[package]]
@@ -454,7 +455,7 @@ dependencies = [
 [[package]]
 name = "latticefold"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#035c0424485f2b1a90b6cdff85b58bf5fcd2e33a"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#0aa25fbb2824c9737e410208560516aca62bf031"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",

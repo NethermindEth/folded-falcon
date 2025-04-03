@@ -1,5 +1,6 @@
 use super::CSRing;
 use latticefold::arith::r1cs::{ConstraintSystem, R1CS, VariableMap};
+use stark_rings::Ring;
 use stark_rings_linalg::SparseMatrix;
 use std::collections::{HashMap, HashSet};
 
@@ -122,7 +123,7 @@ impl<R: CSRing> R1CSBuilder<R> {
             }
         }
 
-        map.add_one(offset);
+        map.set_one(offset);
         offset += 1;
 
         // Map witness vars
@@ -167,13 +168,70 @@ impl<R: CSRing> Default for R1CSBuilder<R> {
     }
 }
 
+/// Helper build the `z` vector
+#[derive(Clone, Debug)]
+pub struct ZBuilder<R: CSRing> {
+    map: VariableMap,
+    set: HashSet<String>,
+    z: Vec<R::Base>,
+}
+
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum ZBuildError {
+    #[error("unexpected length {1} for variable {0}: expected {2} length")]
+    LengthMismatch(String, usize, usize),
+    #[error("variable {0} already set")]
+    AlreadySet(String),
+    #[error("variable {0} not found")]
+    NotFound(String),
+}
+
+impl<R: CSRing> ZBuilder<R> {
+    /// Create a new builder, using a variable map as context.
+    pub fn new(map: VariableMap) -> Self {
+        let total_len = map.total_len();
+        let one_index = map.get_one();
+        let mut z = vec![R::Base::ZERO; total_len];
+        z[one_index] = R::Base::ONE;
+        Self {
+            map,
+            set: HashSet::new(),
+            z,
+        }
+    }
+
+    /// Set a variable's value.
+    pub fn set(&mut self, name: &str, val: &[R::Base]) -> Result<&mut Self, ZBuildError> {
+        if self.set.contains(name) {
+            return Err(ZBuildError::AlreadySet(name.into()));
+        }
+        if let Some((index, len)) = self.map.get(name) {
+            if len != val.len() {
+                return Err(ZBuildError::LengthMismatch(name.into(), val.len(), len));
+            }
+            self.z[index..index + len].copy_from_slice(val);
+        } else {
+            return Err(ZBuildError::NotFound(name.into()));
+        }
+        Ok(self)
+    }
+
+    /// Fetch the currently built `z` vector. This `ZBuilder` instance can then be reused to build
+    /// another `z`.
+    pub fn build(&mut self) -> Vec<R::Base> {
+        self.set.clear();
+        std::mem::take(&mut self.z)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{super::Input, *};
+    use anyhow::Result;
     use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abc_uvw() {
+    fn test_r1cs_composite_ring_mul_double_abc_uvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -187,24 +245,26 @@ mod tests {
             Input::private("w"),
             0,
         ));
-        let (r1cs, _) = builder.build();
+        let (r1cs, map) = builder.build();
 
         // 2*3 = 6
         // 5*10 = 50
-        let z = &[
-            RqNTT::from(2u32),
-            RqNTT::from(3u32),
-            RqNTT::from(5u32),
-            RqNTT::from(10u32),
-            RqNTT::from(1u32), // one
-            RqNTT::from(6u32),
-            RqNTT::from(50u32),
-        ];
-        r1cs.check_relation(z).unwrap();
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("a", &[2u32.into()])?
+            .set("b", &[3u32.into()])?
+            .set("c", &[6u32.into()])?
+            .set("u", &[5u32.into()])?
+            .set("v", &[10u32.into()])?
+            .set("w", &[50u32.into()])?
+            .build();
+
+        r1cs.check_relation(&z).unwrap();
+
+        Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abc_avw() {
+    fn test_r1cs_composite_ring_mul_double_abc_avw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -220,21 +280,21 @@ mod tests {
         ));
         let (r1cs, map) = builder.build();
 
-        let nvars = map.vars().len() + 1;
-
-        let mut z = vec![RqNTT::from(0u32); nvars];
-        z[map.get("a").unwrap().0] = RqNTT::from(2u32);
-        z[map.get("b").unwrap().0] = RqNTT::from(3u32);
-        z[map.get("c").unwrap().0] = RqNTT::from(6u32);
-        z[map.get("v").unwrap().0] = RqNTT::from(10u32);
-        z[map.get("w").unwrap().0] = RqNTT::from(20u32);
-        z[map.get_one()] = RqNTT::from(1u32);
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("a", &[2u32.into()])?
+            .set("b", &[3u32.into()])?
+            .set("c", &[6u32.into()])?
+            .set("v", &[10u32.into()])?
+            .set("w", &[20u32.into()])?
+            .build();
 
         r1cs.check_relation(&z).unwrap();
+
+        Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_abf_fvw() {
+    fn test_r1cs_composite_ring_mul_double_abf_fvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
@@ -250,20 +310,21 @@ mod tests {
         ));
         let (r1cs, map) = builder.build();
 
-        let nvars = map.vars().len() + 1;
-        let mut z = vec![RqNTT::from(0u32); nvars];
-        z[map.get("a").unwrap().0] = RqNTT::from(2u32);
-        z[map.get("b").unwrap().0] = RqNTT::from(3u32);
-        z[map.get("f").unwrap().0] = RqNTT::from(6u32);
-        z[map.get("v").unwrap().0] = RqNTT::from(10u32);
-        z[map.get("w").unwrap().0] = RqNTT::from(60u32);
-        z[map.get_one()] = RqNTT::from(1u32);
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("a", &[2u32.into()])?
+            .set("b", &[3u32.into()])?
+            .set("f", &[6u32.into()])?
+            .set("v", &[10u32.into()])?
+            .set("w", &[60u32.into()])?
+            .build();
 
         r1cs.check_relation(&z).unwrap();
+
+        Ok(())
     }
 
     #[test]
-    fn test_r1cs_composite_ring_mul_double_pabf_fvw() {
+    fn test_r1cs_composite_ring_mul_double_pabf_fvw() -> Result<()> {
         let mut builder = R1CSBuilder::<RqNTT>::new();
         builder.push(RqNTT::cs_mul(
             Input::private("a"),
@@ -279,15 +340,16 @@ mod tests {
         ));
         let (r1cs, map) = builder.build();
 
-        let nvars = map.vars().len() + 1;
-        let mut z = vec![RqNTT::from(0u32); nvars];
-        z[map.get("a").unwrap().0] = RqNTT::from(2u32);
-        z[map.get("b").unwrap().0] = RqNTT::from(3u32);
-        z[map.get("f").unwrap().0] = RqNTT::from(6u32);
-        z[map.get("v").unwrap().0] = RqNTT::from(10u32);
-        z[map.get("w").unwrap().0] = RqNTT::from(60u32);
-        z[map.get_one()] = RqNTT::from(1u32);
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("a", &[2u32.into()])?
+            .set("b", &[3u32.into()])?
+            .set("f", &[6u32.into()])?
+            .set("v", &[10u32.into()])?
+            .set("w", &[60u32.into()])?
+            .build();
 
         r1cs.check_relation(&z).unwrap();
+
+        Ok(())
     }
 }

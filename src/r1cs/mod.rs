@@ -1,7 +1,7 @@
 mod builder;
 mod ops;
 
-pub use builder::R1CSBuilder;
+pub use builder::{R1CSBuilder, ZBuildError, ZBuilder};
 pub use ops::{CSRing, Input};
 
 use cyclotomic_rings::rings::SuitableRing;

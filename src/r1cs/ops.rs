@@ -54,7 +54,7 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
         cs.vars.add(s.name, s_index, k);
         cs.vars.add(sp.name, sp_index, k);
         cs.vars.add(t.name, t_index, k);
-        cs.vars.add_one(one_index);
+        cs.vars.set_one(one_index);
 
         let nvars = 3 * k + 1;
         cs.ninputs = one_index;
@@ -107,7 +107,7 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
         cs.vars.add(s.name.clone(), s_index, k);
         cs.vars.add(sp.name.clone(), sp_index, k);
         cs.vars.add(t.name, t_index, k);
-        cs.vars.add_one(one_index);
+        cs.vars.set_one(one_index);
         cs.vars
             .add(format!("{}*{}", s.name, sp.name), 3 * k + 1, k * k);
 
@@ -178,7 +178,7 @@ impl<R: SuitableRing> CSRing for R {
         cs.vars.add(s.name, s_index, 1);
         cs.vars.add(sp.name, sp_index, 1);
         cs.vars.add(t.name, t_index, 1);
-        cs.vars.add_one(one_index);
+        cs.vars.set_one(one_index);
 
         let nvars = 4;
         cs.ninputs = one_index;
@@ -210,7 +210,7 @@ impl<R: SuitableRing> CSRing for R {
         cs.vars.add(s.name, s_index, 1);
         cs.vars.add(sp.name, sp_index, 1);
         cs.vars.add(t.name, t_index, 1);
-        cs.vars.add_one(one_index);
+        cs.vars.set_one(one_index);
 
         let nvars = 4;
         cs.ninputs = one_index;
@@ -235,7 +235,7 @@ impl<R: SuitableRing> CSRing for R {
         // 2d+2..2d+2+log2(bound): binary decomposition of sum
 
         cs.vars.add(x.name.clone(), 0, 1);
-        cs.vars.add_one(d);
+        cs.vars.set_one(d);
         cs.vars.add(format!("{}*{}", x.name, x.name), d + 1, d);
         cs.vars.add(format!("||{}||^2", x.name), 2 * d + 1, 1);
         cs.vars
