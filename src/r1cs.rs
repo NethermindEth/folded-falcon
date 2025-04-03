@@ -7,6 +7,10 @@ use std::cmp::Ordering;
 pub trait CSRing {
     type Base: SuitableRing;
 
+    /// Addition constraint system for rings, `s + sp = t`.
+    /// `k` is the number of splits for a [`SplitRing`]
+    fn cs_add(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<Self::Base>;
+
     /// Multiplication constraint system for rings, `s * sp = t`.
     /// `k` is the number of splits for a [`SplitRing`]
     fn cs_mul(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<Self::Base>;
@@ -19,6 +23,48 @@ pub trait CSRing {
 
 impl<R: SuitableRing> CSRing for SplitRing<R> {
     type Base = R;
+
+    fn cs_add(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<R> {
+        let mut cs = ConstraintSystem::<R>::new();
+
+        // Variables (one witness ring):
+        // 0..k: public ring
+        // k..2k: public ring
+        // 2k: constant 1
+        // 2k+1..3k+1: private ring
+
+        // Variables (two witness rings):
+        // 0..k: public ring
+        // k: constant 1
+        // k+1..2k+1: private ring
+        // 2k+1..3k+1: private ring
+
+        let (s_index, sp_index, t_index, one_index) = match (s, sp, t) {
+            (Input::Public, Input::Public, Input::Private) => (0, k, 2 * k + 1, 2 * k),
+            (Input::Private, Input::Private, Input::Public) => (k + 1, 2 * k + 1, 0, k),
+            (Input::Public, Input::Private, Input::Public)
+            | (Input::Private, Input::Public, Input::Public) => (0, 2 * k + 1, k, 2 * k),
+            (Input::Public, Input::Private, Input::Private)
+            | (Input::Private, Input::Public, Input::Private) => (0, k + 1, 2 * k + 1, k),
+            _ => panic!("{s:?} + {sp:?} = {t:?} relation not supported"),
+        };
+
+        let nvars = 3 * k + 1;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
+
+        // For each split, s_l + s'_l = t_l
+        for l in 0..k {
+            let a = LinearCombination::new()
+                .add_term(1u64, s_index + l)
+                .add_term(1u64, sp_index + l);
+            let b = LinearCombination::single_term(1u64, one_index);
+            let c = LinearCombination::single_term(1u64, t_index + l);
+            cs.add_constraint(Constraint::new(a, b, c));
+        }
+
+        cs
+    }
 
     fn cs_mul(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<R> {
         let mut cs = ConstraintSystem::<R>::new();
@@ -97,6 +143,33 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
 
 impl<R: SuitableRing> CSRing for R {
     type Base = R;
+
+    fn cs_add(s: Input, sp: Input, t: Input, _k: usize) -> ConstraintSystem<R> {
+        let mut cs = ConstraintSystem::<R>::new();
+
+        let (s_index, sp_index, t_index, one_index) = match (s, sp, t) {
+            (Input::Public, Input::Public, Input::Private) => (0, 1, 3, 2),
+            (Input::Private, Input::Private, Input::Public) => (2, 3, 0, 1),
+            (Input::Public, Input::Private, Input::Public)
+            | (Input::Private, Input::Public, Input::Public) => (3, 0, 1, 2),
+            (Input::Public, Input::Private, Input::Private)
+            | (Input::Private, Input::Public, Input::Private) => (2, 0, 3, 1),
+            _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
+        };
+
+        let nvars = 4;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
+
+        let a = LinearCombination::new()
+            .add_term(1u64, s_index)
+            .add_term(1u64, sp_index);
+        let b = LinearCombination::single_term(1u64, one_index);
+        let c = LinearCombination::single_term(1u64, t_index);
+        cs.add_constraint(Constraint::new(a, b, c));
+
+        cs
+    }
 
     fn cs_mul(s: Input, sp: Input, t: Input, _k: usize) -> ConstraintSystem<R> {
         let mut cs = ConstraintSystem::<R>::new();
@@ -625,6 +698,160 @@ mod tests {
             };
             z.push(bit);
         }
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_add_ppw() {
+        let r1cs = RqNTT::cs_add(Input::Public, Input::Public, Input::Private, 0).to_r1cs();
+        // 2+3 = 5
+        let z = &[
+            RqNTT::from(2u32),
+            RqNTT::from(3u32),
+            RqNTT::from(1u32),
+            RqNTT::from(5u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_add_wwp() {
+        let r1cs = RqNTT::cs_add(Input::Private, Input::Private, Input::Public, 0).to_r1cs();
+        // 2+3 = 5
+        let z = &[
+            RqNTT::from(5u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+            RqNTT::from(3u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_add_wpw() {
+        let r1cs = RqNTT::cs_add(Input::Private, Input::Public, Input::Private, 0).to_r1cs();
+        // 2+3 = 5
+        let z = &[
+            RqNTT::from(3u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+            RqNTT::from(5u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_add_wpp() {
+        let r1cs = RqNTT::cs_add(Input::Private, Input::Public, Input::Public, 0).to_r1cs();
+        // 2+3 = 5
+        let z = &[
+            RqNTT::from(3u32),
+            RqNTT::from(5u32),
+            RqNTT::from(1u32),
+            RqNTT::from(2u32),
+        ];
+        r1cs.check_relation(z).unwrap();
+    }
+
+    fn splitring_add_setup(k: usize) -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>) {
+        // 5X^10 + 3X^10 = 8X^10
+        let mut a_r = vec![0u128; 512];
+        a_r[10] = 5;
+        let mut b_r = vec![0u128; 512];
+        b_r[10] = 3;
+
+        let a: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&a_r).crt();
+        let b: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&b_r).crt();
+        let c: SplitRing<RqNTT> = a.clone() + b.clone();
+
+        // output poly t = [t_l]
+        let t = c.splits().to_vec();
+        assert_eq!(t.len(), k);
+
+        (a, b, t)
+    }
+
+    #[test]
+    fn test_r1cs_splitring_add_ppw() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = SplitRing::cs_add(Input::Public, Input::Public, Input::Private, k).to_r1cs();
+        let (a, b, t) = splitring_add_setup(k);
+        let mut z = Vec::with_capacity(3 * k + 1); // inputs + constant 1 + output
+
+        // public inputs s, s'
+        z.extend(a.splits());
+        z.extend(b.splits());
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness (add result)
+        z.extend(t);
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_add_wwp() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = SplitRing::cs_add(Input::Private, Input::Private, Input::Public, k).to_r1cs();
+        let (a, b, t) = splitring_add_setup(k);
+        let mut z = Vec::with_capacity(3 * k + 1); // inputs + constant 1 + output
+
+        // public input (add result)
+        z.extend(t);
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s, s'
+        z.extend(a.splits());
+        z.extend(b.splits());
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_add_wpp() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = SplitRing::cs_add(Input::Private, Input::Public, Input::Public, k).to_r1cs();
+        let (a, b, t) = splitring_add_setup(k);
+        let mut z = Vec::with_capacity(3 * k + 1); // inputs + constant 1 + output
+
+        // public inputs (s', add result)
+        z.extend(b.splits());
+        z.extend(t);
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s
+        z.extend(a.splits());
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_add_wpw() {
+        // Falcon degree = 512, Frog ring of degree 16
+        let k = 32; // n subrings
+        let r1cs = SplitRing::cs_add(Input::Private, Input::Public, Input::Private, k).to_r1cs();
+        let (a, b, t) = splitring_add_setup(k);
+        let mut z = Vec::with_capacity(3 * k + 1); // inputs + constant 1 + output
+
+        // public inputs s'
+        z.extend(b.splits());
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness s, add result
+        z.extend(a.splits());
+        z.extend(t);
 
         r1cs.check_relation(&z).unwrap();
     }
