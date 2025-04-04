@@ -30,7 +30,8 @@ pub fn signature_verification_r1cs<R: CSRing>(
         k,
     );
     // norm bound
-    let norm_bound = R::cs_norm_bound_xy(Input::private("s1"), Input::private("s2"), d, log_bound);
+    let norm_bound =
+        R::cs_norm_bound_xy(Input::private("s1p"), Input::private("s2p"), d, log_bound);
 
     builder.push(s2h);
     builder.push(fin);
@@ -69,8 +70,10 @@ pub fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{SplitRing, SplitRingPoly};
     use anyhow::Result;
-    use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
+    use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
+    use stark_rings::PolyRing;
 
     #[test]
     fn test_r1cs_signature_verification() {
@@ -99,14 +102,94 @@ mod tests {
             .set("s1", &[1u32.into()])?
             .set("s2", &[2u32.into()])?
             .set("s2h", &[6u32.into()])?
-            .set("s1*s1", &[1u32.into()])?
-            .set("s2*s2", &[4u32.into()])?
-            .set("||s1||^2", &[1u32.into()])?
-            .set("||s2||^2", &[4u32.into()])?
+            .set("s1p", &[1u32.into()])?
+            .set("s2p", &[2u32.into()])?
+            .set("s1p*s1p", &[1u32.into()])?
+            .set("s2p*s2p", &[4u32.into()])?
+            .set("||s1p||^2", &[1u32.into()])?
+            .set("||s2p||^2", &[4u32.into()])?
             .set(
-                "||s1,s2||^2 decomp",
+                "||s1p,s2p||^2 decomp",
                 &[1u32.into(), 0u32.into(), 1u32.into(), 0u32.into()],
             )? // Binary decomposition of 5 (total norm)
+            .build()?;
+
+        r1cs.check_relation(&z)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_r1cs_splitring_signature_verification_w_bound() -> Result<()> {
+        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(32, 512, 16);
+
+        // 20X^40 + 5X^10 * 5X^10 = 25X^20 + 20X^40
+        let mut h = vec![0u128; 512];
+        h[10] = 5;
+        let mut s2 = vec![0u128; 512];
+        s2[10] = 5;
+        let mut s1 = vec![0u128; 512];
+        s1[40] = 20;
+        let mut c = vec![0u128; 512];
+        c[20] = 25;
+        c[40] = 20;
+
+        let h_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&h).crt();
+        let s2_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&s2).crt();
+        let s1_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&s1).crt();
+        let c_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&c).crt();
+        let s2h_cross = &(0..32 * 32)
+            .map(|idx| {
+                let i = idx / 32;
+                let j = idx % 32;
+                s2_r.splits()[i] * h_r.splits()[j]
+            })
+            .collect::<Vec<_>>();
+
+        let s1_p = s1
+            .iter()
+            .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+            .collect::<Vec<_>>();
+        let s2_p = s2
+            .iter()
+            .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+            .collect::<Vec<_>>();
+
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("h", h_r.splits())?
+            .set("c", c_r.splits())?
+            .set("s1", s1_r.splits())?
+            .set("s2", s2_r.splits())?
+            .set("s2h", (h_r.clone() * s2_r.clone()).splits())?
+            .set("s1p", &s1_p)?
+            .set("s2p", &s2_p)?
+            .set("s1p*s1p", &s1_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+            .set("s2p*s2p", &s2_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+            .set("||s1p||^2", &[RqNTT::from(400u32)])?
+            .set("||s2p||^2", &[RqNTT::from(25u32)])?
+            .set(
+                "||s1p,s2p||^2 decomp",
+                &[
+                    RqNTT::from(1u32), // 2^0
+                    RqNTT::from(0u32), // 2^1
+                    RqNTT::from(0u32), // 2^2
+                    RqNTT::from(1u32), // 2^3
+                    RqNTT::from(0u32), // 2^4
+                    RqNTT::from(1u32), // 2^5
+                    RqNTT::from(0u32), // 2^6
+                    RqNTT::from(1u32), // 2^7
+                    RqNTT::from(1u32), // 2^8
+                    RqNTT::from(0u32), // 2^9
+                    RqNTT::from(0u32), // 2^10
+                    RqNTT::from(0u32), // 2^11
+                    RqNTT::from(0u32), // 2^12
+                    RqNTT::from(0u32), // 2^13
+                    RqNTT::from(0u32), // 2^14
+                    RqNTT::from(0u32), // 2^15
+                ],
+            )?
+            // Add cross-multiplication terms for s2*h
+            .set("s2*h", s2h_cross)?
             .build()?;
 
         r1cs.check_relation(&z)?;
