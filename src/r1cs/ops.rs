@@ -17,6 +17,16 @@ pub trait CSRing {
     /// `log_bound` must be the log2 of the norm bound. Only powers of 2 bounds are currently supported.
     /// The norm is constrained to be representable with only `log_bound` bits.
     fn cs_norm_bound(x: Input, d: usize, log_bound: usize) -> ConstraintSystem<Self::Base>;
+
+    /// CS with l2- norm calculation, norm bound constraints, for two polynomials of degree `d`.
+    /// `log_bound` must be the log2 of the norm bound. Only powers of 2 bounds are currently supported.
+    /// The norm is constrained to be representable with only `log_bound` bits.
+    fn cs_norm_bound_xy(
+        x: Input,
+        y: Input,
+        d: usize,
+        log_bound: usize,
+    ) -> ConstraintSystem<Self::Base>;
 }
 
 impl<R: SuitableRing> CSRing for SplitRing<R> {
@@ -157,6 +167,15 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
     fn cs_norm_bound(x: Input, d: usize, log_bound: usize) -> ConstraintSystem<Self::Base> {
         <Self::Base as CSRing>::cs_norm_bound(x, d, log_bound)
     }
+
+    fn cs_norm_bound_xy(
+        x: Input,
+        y: Input,
+        d: usize,
+        log_bound: usize,
+    ) -> ConstraintSystem<Self::Base> {
+        <Self::Base as CSRing>::cs_norm_bound_xy(x, y, d, log_bound)
+    }
 }
 
 impl<R: SuitableRing> CSRing for R {
@@ -284,6 +303,105 @@ impl<R: SuitableRing> CSRing for R {
         cs.add_constraint(Constraint::new(
             LinearCombination::single_term(1u64, 2 * d + 1),
             LinearCombination::single_term(1u64, d),
+            binary_sum,
+        ));
+
+        cs
+    }
+
+    fn cs_norm_bound_xy(x: Input, y: Input, d: usize, log_bound: usize) -> ConstraintSystem<R> {
+        let mut cs = ConstraintSystem::<R>::new();
+
+        // ||x||^2 + ||y||^2  < 2^log_bound
+
+        // Variables:
+        // 0..d: input x = [x_i] coefficients
+        // d..2d: input y = [y_i] coefficients
+        // 2d: constant 1 (auxiliary input)
+        // 2d+1..3d+1: auxiliary variables for x_i * x_i (squared coeffs)
+        // 3d+1..4d+1: auxiliary variables for y_i * y_i (squared coeffs)
+        // 4d+1: auxiliary variable for ||x||^2
+        // 4d+2: auxiliary variable for ||y||^2
+        // 4d+3..4d+3+log2(bound): binary decomposition of sum
+
+        cs.vars.add(x.name.clone(), 0, d);
+        cs.vars.add(y.name.clone(), d, d);
+        cs.vars.set_one(2 * d);
+        cs.vars.add(format!("{}*{}", x.name, x.name), 2 * d + 1, d);
+        cs.vars.add(format!("{}*{}", y.name, y.name), 3 * d + 1, d);
+        cs.vars.add(format!("||{}||^2", x.name), 4 * d + 1, 1);
+        cs.vars.add(format!("||{}||^2", y.name), 4 * d + 2, 1);
+        cs.vars.add(
+            format!("||{},{}||^2 decomp", x.name, y.name),
+            4 * d + 3,
+            log_bound,
+        );
+
+        cs.ninputs = 2 * d;
+        cs.nauxs = 2 * d + 3 + log_bound;
+
+        // For each coefficient x_i, compute x_i * x_i
+        for i in 0..d {
+            let a = LinearCombination::single_term(1u64, i); // x_i
+            let b = LinearCombination::single_term(1u64, i); // x_i
+            let c = LinearCombination::single_term(1u64, 2 * d + 1 + i); // x_i * x_i
+            cs.add_constraint(Constraint::new(a, b, c));
+        }
+
+        // For each coefficient y_i, compute y_i * y_i
+        for i in 0..d {
+            let a = LinearCombination::single_term(1u64, d + i); // y_i
+            let b = LinearCombination::single_term(1u64, d + i); // y_i
+            let c = LinearCombination::single_term(1u64, 3 * d + 1 + i); // y_i * y_i
+            cs.add_constraint(Constraint::new(a, b, c));
+        }
+
+        // sum of squares for x
+        let mut sum_terms_x = Vec::with_capacity(d);
+        for i in 0..d {
+            sum_terms_x.push((1u64.into(), 2 * d + 1 + i));
+        }
+        let sum_x = LinearCombination::new().add_terms(&sum_terms_x);
+        let output_x = LinearCombination::single_term(1u64, 4 * d + 1);
+        cs.add_constraint(Constraint::new(
+            sum_x,
+            LinearCombination::single_term(1u64, 2 * d),
+            output_x,
+        ));
+
+        // sum of squares for y
+        let mut sum_terms_y = Vec::with_capacity(d);
+        for i in 0..d {
+            sum_terms_y.push((1u64.into(), 3 * d + 1 + i));
+        }
+        let sum_y = LinearCombination::new().add_terms(&sum_terms_y);
+        let output_y = LinearCombination::single_term(1u64, 4 * d + 2);
+        cs.add_constraint(Constraint::new(
+            sum_y,
+            LinearCombination::single_term(1u64, 2 * d),
+            output_y,
+        ));
+
+        // binary decomposition of the sum
+        for i in 0..log_bound {
+            let bit = LinearCombination::single_term(1u64, 4 * d + 3 + i);
+            cs.add_constraint(Constraint::new(bit.clone(), bit.clone(), bit));
+        }
+
+        // total sum = binary_sum
+        let mut binary_terms: Vec<(R, usize)> = Vec::with_capacity(log_bound);
+        for i in 0..log_bound {
+            binary_terms.push(((1u64 << i).into(), 4 * d + 3 + i));
+        }
+        let binary_sum = LinearCombination::new().add_terms(&binary_terms);
+
+        // ||x||^2 + ||y||^2 = binary_sum
+        let total_sum = LinearCombination::new()
+            .add_term(1u64, 4 * d + 1) // ||x||^2
+            .add_term(1u64, 4 * d + 2); // ||y||^2
+        cs.add_constraint(Constraint::new(
+            total_sum,
+            LinearCombination::single_term(1u64, 2 * d),
             binary_sum,
         ));
 
@@ -605,6 +723,69 @@ mod tests {
     }
 
     #[test]
+    fn test_r1cs_ring_norm_bound_xy() {
+        let mut rng = rand::thread_rng();
+        let bound = 16; // 2^16
+        let d = 512;
+        let r1cs =
+            RqNTT::cs_norm_bound_xy(Input::public("a"), Input::public("b"), d, bound).to_r1cs();
+
+        let a_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+        let b_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+
+        let norm_a: u128 = a_r.iter().map(|x| x * x).sum();
+        let norm_b: u128 = b_r.iter().map(|x| x * x).sum();
+        let total_norm = norm_a + norm_b;
+
+        assert!(total_norm < (1u128 << bound));
+
+        let mut z = Vec::with_capacity(4 * d + 2 + bound);
+
+        z.extend(
+            a_r.iter()
+                .map(|x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*x))),
+        );
+        z.extend(
+            b_r.iter()
+                .map(|x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*x))),
+        );
+
+        z.push(RqNTT::from(1u32)); // constant 1
+
+        a_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )));
+        });
+
+        b_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )));
+        });
+
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm_a,
+        )));
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm_b,
+        )));
+
+        let mut remaining = total_norm;
+        for i in 0..bound {
+            let bit = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+            z.push(bit);
+        }
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
     fn test_r1cs_splitring_norm_bound() {
         let mut rng = rand::thread_rng();
         let bound = 16; // 2^16
@@ -640,6 +821,71 @@ mod tests {
         )));
 
         let mut remaining = norm;
+        for i in 0..bound {
+            let bit = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+            z.push(bit);
+        }
+
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_norm_bound_xy() {
+        let mut rng = rand::thread_rng();
+        let bound = 16; // 2^16
+        let d = 512;
+        let r1cs =
+            SplitRing::<RqNTT>::cs_norm_bound_xy(Input::public("a"), Input::public("b"), d, bound)
+                .to_r1cs();
+
+        let a_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+        let b_r = (0..d).map(|_| rng.gen_range(0..10)).collect::<Vec<_>>();
+
+        let norm_a: u128 = a_r.iter().map(|x| x * x).sum();
+        let norm_b: u128 = b_r.iter().map(|x| x * x).sum();
+        let total_norm = norm_a + norm_b;
+
+        assert!(total_norm < (1u128 << bound));
+
+        let mut z = Vec::with_capacity(4 * d + 2 + bound);
+
+        // public input poly
+        z.extend(
+            a_r.iter()
+                .map(|x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*x))),
+        );
+        z.extend(
+            b_r.iter()
+                .map(|x| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*x))),
+        );
+
+        z.push(RqNTT::from(1u32)); // constant 1    
+
+        a_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )));
+        });
+
+        b_r.iter().for_each(|coeff| {
+            z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+                coeff * coeff,
+            )));
+        });
+
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm_a,
+        )));
+        z.push(RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(
+            norm_b,
+        )));
+
+        let mut remaining = total_norm;
         for i in 0..bound {
             let bit = if (remaining & (1 << i)) != 0 {
                 remaining -= 1 << i;

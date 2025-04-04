@@ -9,7 +9,11 @@ use latticefold::arith::r1cs::{
     Constraint, ConstraintSystem, LinearCombination, R1CS, VariableMap,
 };
 
-pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> (R1CS<R::Base>, VariableMap) {
+pub fn signature_verification_r1cs<R: CSRing>(
+    k: usize,
+    d: usize,
+    log_bound: usize,
+) -> (R1CS<R::Base>, VariableMap) {
     let mut builder = R1CSBuilder::<R>::new();
     // s2*h
     let s2h = R::cs_mul(
@@ -26,7 +30,7 @@ pub fn signature_verification_r1cs<R: CSRing>(k: usize) -> (R1CS<R::Base>, Varia
         k,
     );
     // norm bound
-    let norm_bound = R::cs_norm_bound(Input::private("s2"), 1, 4);
+    let norm_bound = R::cs_norm_bound_xy(Input::private("s1"), Input::private("s2"), d, log_bound);
 
     builder.push(s2h);
     builder.push(fin);
@@ -86,8 +90,8 @@ mod tests {
     #[test]
     fn test_r1cs_signature_verification_w_bound() -> Result<()> {
         // 1 + 2*3 = 7
-        // ||2||^2 = 4 < 2^4
-        let (r1cs, map) = signature_verification_r1cs::<RqNTT>(0);
+        // ||s1||^2 + ||s2||^2 = 5 < 2^4
+        let (r1cs, map) = signature_verification_r1cs::<RqNTT>(0, 1, 4);
 
         let z = ZBuilder::<RqNTT>::new(map)
             .set("h", &[3u32.into()])?
@@ -95,12 +99,14 @@ mod tests {
             .set("s1", &[1u32.into()])?
             .set("s2", &[2u32.into()])?
             .set("s2h", &[6u32.into()])?
+            .set("s1*s1", &[1u32.into()])?
             .set("s2*s2", &[4u32.into()])?
+            .set("||s1||^2", &[1u32.into()])?
             .set("||s2||^2", &[4u32.into()])?
             .set(
-                "s2 decomp",
-                &[0u32.into(), 0u32.into(), 1u32.into(), 0u32.into()],
-            )?
+                "||s1,s2||^2 decomp",
+                &[1u32.into(), 0u32.into(), 1u32.into(), 0u32.into()],
+            )? // Binary decomposition of 5 (total norm)
             .build()?;
 
         r1cs.check_relation(&z)?;
