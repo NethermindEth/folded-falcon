@@ -121,7 +121,10 @@ mod tests {
 
     #[test]
     fn test_r1cs_splitring_signature_verification_w_bound() -> Result<()> {
-        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(32, 512, 16);
+        let d = 512;
+        let k = 32;
+        let log_bound = 16;
+        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
 
         // 20X^40 + 5X^10 * 5X^10 = 25X^20 + 20X^40
         let mut h = vec![0u128; 512];
@@ -155,6 +158,18 @@ mod tests {
             .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
             .collect::<Vec<_>>();
 
+        let norm = s1.iter().map(|c| c * c).sum::<u128>() + s2.iter().map(|c| c * c).sum::<u128>();
+        let mut remaining = norm;
+        let mut norm_decomp = vec![RqNTT::from(0u32); log_bound];
+        for (i, c) in norm_decomp.iter_mut().enumerate() {
+            *c = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+        }
+
         let z = ZBuilder::<RqNTT>::new(map)
             .set("h", h_r.splits())?
             .set("c", c_r.splits())?
@@ -167,27 +182,7 @@ mod tests {
             .set("s2p*s2p", &s2_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
             .set("||s1p||^2", &[RqNTT::from(400u32)])?
             .set("||s2p||^2", &[RqNTT::from(25u32)])?
-            .set(
-                "||s1p,s2p||^2 decomp",
-                &[
-                    RqNTT::from(1u32), // 2^0
-                    RqNTT::from(0u32), // 2^1
-                    RqNTT::from(0u32), // 2^2
-                    RqNTT::from(1u32), // 2^3
-                    RqNTT::from(0u32), // 2^4
-                    RqNTT::from(1u32), // 2^5
-                    RqNTT::from(0u32), // 2^6
-                    RqNTT::from(1u32), // 2^7
-                    RqNTT::from(1u32), // 2^8
-                    RqNTT::from(0u32), // 2^9
-                    RqNTT::from(0u32), // 2^10
-                    RqNTT::from(0u32), // 2^11
-                    RqNTT::from(0u32), // 2^12
-                    RqNTT::from(0u32), // 2^13
-                    RqNTT::from(0u32), // 2^14
-                    RqNTT::from(0u32), // 2^15
-                ],
-            )?
+            .set("||s1p,s2p||^2 decomp", &norm_decomp)?
             // Add cross-multiplication terms for s2*h
             .set("s2*h", s2h_cross)?
             .build()?;
