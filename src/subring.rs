@@ -6,7 +6,7 @@ use stark_rings::{
     balanced_decomposition::convertible_ring::ConvertibleRing,
     cyclotomic_ring::{CRT, ICRT},
 };
-use std::ops::{Add, AddAssign, Mul, MulAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 /// A ring R's decomposed representation into subrings S. Elements are in coefficient form.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -125,6 +125,23 @@ impl<S: PolyRing> Add for SplitRingPoly<S> {
     }
 }
 
+impl<S: PolyRing> SubAssign for SplitRingPoly<S> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0
+            .iter_mut()
+            .zip(rhs.0.iter())
+            .for_each(|(a_i, b_i)| *a_i -= b_i);
+    }
+}
+
+impl<S: PolyRing> Sub for SplitRingPoly<S> {
+    type Output = Self;
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self -= rhs;
+        self
+    }
+}
+
 impl<S: PolyRing> MulAssign for SplitRingPoly<S> {
     fn mul_assign(&mut self, rhs: Self) {
         let k = self.0.len();
@@ -213,6 +230,24 @@ impl<U: SuitableRing> Add for SplitRing<U> {
     }
 }
 
+impl<U: SuitableRing> SubAssign for SplitRing<U> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0
+            .iter_mut()
+            .zip(rhs.0.iter())
+            .for_each(|(a_i, b_i)| *a_i -= b_i);
+    }
+}
+
+impl<U: SuitableRing> Sub for SplitRing<U> {
+    type Output = Self;
+
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self -= rhs;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,8 +295,8 @@ mod tests {
     }
 
     #[test]
-    fn test_subring_add() {
-        // 5X^10 * 5X^10
+    fn test_splitring_poly_add() {
+        // 5X^10 + 5X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
         let mut r2 = vec![0u128; 512];
@@ -282,7 +317,28 @@ mod tests {
     }
 
     #[test]
-    fn test_subring_mul() {
+    fn test_splitring_poly_sub() {
+        // 7X^10 - 5X^10
+        let mut r1 = vec![0u128; 512];
+        r1[10] = 7;
+        let mut r2 = vec![0u128; 512];
+        r2[10] = 5;
+
+        let s1: SplitRingPoly<Poly> = SplitRingPoly::from_r(&r1);
+        let s2: SplitRingPoly<Poly> = SplitRingPoly::from_r(&r2);
+
+        let sm = s1 - s2;
+        let rm = sm.recompose();
+
+        let mut expected = vec![0u128; 512];
+        // 2X^10
+        expected[10] = 2;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_poly_mul() {
         // 5X^10 * 5X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
@@ -304,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subring_mul_ntt_0() {
+    fn test_splitring_ntt_mul_0() {
         // 5X^10 * 5X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
@@ -328,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subring_mul_ntt_1() {
+    fn test_splitring_ntt_mul_1() {
         // 5X^10 * 5X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
@@ -353,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn test_splitring_add() {
+    fn test_splitring_ntt_add() {
         // 5X^10 + 3X^10
         let mut r1 = vec![0u128; 512];
         r1[10] = 5;
@@ -370,6 +426,28 @@ mod tests {
         let mut expected = vec![0u128; 512];
         // 8X^10
         expected[10] = 8;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_ntt_sub() {
+        // 5X^10 - 3X^10
+        let mut r1 = vec![0u128; 512];
+        r1[10] = 5;
+        let mut r2 = vec![0u128; 512];
+        r2[10] = 3;
+
+        let s1: SplitRing<NTT> = SplitRingPoly::from_r(&r1).crt();
+        let s2: SplitRing<NTT> = SplitRingPoly::from_r(&r2).crt();
+
+        let sm_ntt = s1 - s2;
+        let sm = sm_ntt.icrt();
+        let rm = sm.recompose();
+
+        let mut expected = vec![0u128; 512];
+        // 2X^10
+        expected[10] = 2;
 
         assert_eq!(rm, expected);
     }
