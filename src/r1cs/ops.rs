@@ -66,6 +66,10 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
             | (InputType::Private, InputType::Public, InputType::Private) => {
                 (0, k + 1, 2 * k + 1, k)
             }
+            // All private inputs: should only be used with other systems
+            (InputType::Private, InputType::Private, InputType::Private) => {
+                (1, k + 1, 2 * k + 1, 0)
+            }
             _ => panic!("{s:?} + {sp:?} = {t:?} relation not supported"),
         };
 
@@ -164,6 +168,10 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
             | (InputType::Private, InputType::Public, InputType::Private) => {
                 (0, k + 1, 2 * k + 1, k)
             }
+            // All private inputs: should only be used with other systems
+            (InputType::Private, InputType::Private, InputType::Private) => {
+                (1, k + 1, 2 * k + 1, 0)
+            }
             _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
         };
 
@@ -244,6 +252,8 @@ impl<R: SuitableRing> CSRing for R {
             | (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
             (InputType::Public, InputType::Private, InputType::Private)
             | (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
+            // All private inputs: should only be used with other systems
+            (InputType::Private, InputType::Private, InputType::Private) => (1, 2, 3, 0),
             _ => panic!("{s:?} + {sp:?} = {t:?} relation not supported"),
         };
 
@@ -276,6 +286,8 @@ impl<R: SuitableRing> CSRing for R {
             | (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
             (InputType::Public, InputType::Private, InputType::Private)
             | (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
+            // All private inputs: should only be used with other systems
+            (InputType::Private, InputType::Private, InputType::Private) => (1, 2, 3, 0),
             _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
         };
 
