@@ -84,6 +84,31 @@ impl<S: PolyRing> SplitRingPoly<S> {
         SplitRing(CRT::elementwise_crt(self.0))
     }
 
+    /// Calculates a lifting polynomial `v`, where `self mod p` is lifted to `self + p*v mod q`
+    pub fn lift(&self, p: u128) -> Self
+    where
+        S::BaseRing: ConvertibleRing,
+    {
+        let p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p);
+        Self(
+            self.splits()
+                .iter()
+                .map(|split| {
+                    split
+                        .coeffs()
+                        .iter()
+                        .map(|c| {
+                            let c_int =
+                                Into::<<S::BaseRing as ConvertibleRing>::UnsignedInt>::into(*c);
+                            S::BaseRing::from(c_int / p.clone())
+                        })
+                        .collect::<Vec<_>>()
+                        .into()
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
     pub fn into_vec(self) -> Vec<S> {
         self.0
     }
@@ -174,6 +199,21 @@ impl<S: PolyRing> Mul for SplitRingPoly<S> {
     }
 }
 
+impl<S: PolyRing + for<'a> MulAssign<&'a u128>> MulAssign<&u128> for SplitRingPoly<S> {
+    fn mul_assign(&mut self, rhs: &u128) {
+        self.0.iter_mut().for_each(|s_i| *s_i *= rhs);
+    }
+}
+
+impl<S: PolyRing + for<'a> MulAssign<&'a u128>> Mul<&u128> for SplitRingPoly<S> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &u128) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
 impl<U: SuitableRing> Mul for SplitRing<U> {
     type Output = Self;
 
@@ -201,6 +241,21 @@ impl<U: SuitableRing> Mul for SplitRing<U> {
 impl<U: SuitableRing> MulAssign for SplitRing<U> {
     fn mul_assign(&mut self, rhs: Self) {
         *self = self.clone() * rhs;
+    }
+}
+
+impl<U: SuitableRing> MulAssign<&u128> for SplitRing<U> {
+    fn mul_assign(&mut self, rhs: &u128) {
+        self.0.iter_mut().for_each(|s_i| *s_i *= rhs);
+    }
+}
+
+impl<U: SuitableRing> Mul<&u128> for SplitRing<U> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &u128) -> Self::Output {
+        self *= rhs;
+        self
     }
 }
 
@@ -251,6 +306,7 @@ impl<U: SuitableRing> Sub for SplitRing<U> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FALCON_MOD;
 
     use cyclotomic_rings::rings::FrogRingNTT as NTT;
     use cyclotomic_rings::rings::FrogRingPoly as Poly;
@@ -448,6 +504,72 @@ mod tests {
         let mut expected = vec![0u128; 512];
         // 2X^10
         expected[10] = 2;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_poly_lift() {
+        // 5X^3 + 3000*X^10 * 5X^10 = (5X^3 + 2711^20) mod p
+        // 5X^3 + 3000*X^10 * 5X^10 = (5X^3 + 15000X^20) mod q
+        // 5X^3 + 3000*X^10 * 5X^10 + pv = (5X^3 + 2711^20) mod q
+        let mut s1 = vec![0u128; 512];
+        s1[3] = 5;
+        let mut s2 = vec![0u128; 512];
+        s2[10] = 3000;
+        let mut h = vec![0u128; 512];
+        h[10] = 5;
+        let mut c = vec![0u128; 512];
+        c[3] = 5;
+        c[20] = 15000;
+        let mut v = vec![0u128; 512];
+        v[20] = 1;
+
+        let s1: SplitRingPoly<Poly> = SplitRingPoly::from_r(&s1);
+        let s2: SplitRingPoly<Poly> = SplitRingPoly::from_r(&s2);
+        let h: SplitRingPoly<Poly> = SplitRingPoly::from_r(&h);
+        let c: SplitRingPoly<Poly> = SplitRingPoly::from_r(&c);
+        let v = c.lift(FALCON_MOD);
+
+        let sm = s1 + s2 * h - v * &FALCON_MOD;
+        let rm = sm.recompose();
+
+        let mut expected = vec![0u128; 512];
+        expected[3] = 5;
+        expected[20] = 2711;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_ntt_lift() {
+        // 5X^3 + 3000*X^10 * 5X^10 = (5X^3 + 2711^20) mod p
+        // 5X^3 + 3000*X^10 * 5X^10 = (5X^3 + 15000X^20) mod q
+        // 5X^3 + 3000*X^10 * 5X^10 + pv = (5X^3 + 2711^20) mod q
+        let mut s1 = vec![0u128; 512];
+        s1[3] = 5;
+        let mut s2 = vec![0u128; 512];
+        s2[10] = 3000;
+        let mut h = vec![0u128; 512];
+        h[10] = 5;
+        let mut c = vec![0u128; 512];
+        c[3] = 5;
+        c[20] = 15000;
+        let mut v = vec![0u128; 512];
+        v[20] = 1;
+
+        let s1: SplitRing<NTT> = SplitRingPoly::from_r(&s1).crt();
+        let s2: SplitRing<NTT> = SplitRingPoly::from_r(&s2).crt();
+        let h: SplitRing<NTT> = SplitRingPoly::from_r(&h).crt();
+        let c: SplitRingPoly<Poly> = SplitRingPoly::from_r(&c);
+        let v = c.lift(FALCON_MOD).crt();
+
+        let sm = s1 + s2 * h - v * &FALCON_MOD;
+        let rm = sm.icrt().recompose();
+
+        let mut expected = vec![0u128; 512];
+        expected[3] = 5;
+        expected[20] = 2711;
 
         assert_eq!(rm, expected);
     }
