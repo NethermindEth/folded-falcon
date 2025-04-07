@@ -22,10 +22,23 @@ pub fn signature_verification_r1cs<R: CSRing>(
         Input::private("s2h"),
         k,
     );
-    // s1 + s2h = c
+    // pv lifting factor
+    let pv = R::cs_mul(
+        Input::private("v"),
+        Input::public("p"),
+        Input::private("pv"),
+        k,
+    );
+    // s1 + s2h - pv = c
     let fin = R::cs_add(
         Input::private("s1"),
         Input::private("s2h"),
+        Input::private("s1+s2h"),
+        k,
+    );
+    let fin2 = R::cs_add(
+        Input::private("s1+s2h"),
+        Input::private("pv"),
         Input::public("c"),
         k,
     );
@@ -34,7 +47,9 @@ pub fn signature_verification_r1cs<R: CSRing>(
         R::cs_norm_bound_xy(Input::private("s1p"), Input::private("s2p"), d, log_bound);
 
     builder.push(s2h);
+    builder.push(pv);
     builder.push(fin);
+    builder.push(fin2);
     builder.push(norm_bound);
 
     builder.build()
