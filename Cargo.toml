@@ -6,12 +6,16 @@ edition = "2024"
 [dependencies]
 anyhow = "1"
 ark-ff = "0.4.2"
+bit-vec = "0.6"
 cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
-falcon-rust = "0.1.2"
+#falcon-rust = { git = "https://github.com/v0-e/falcon-rust", branch = "pub" }
+falcon-rust = { path = "../vfalcon/falcon-rust" }
+itertools = "0.12"
 latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
-stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
-stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
+num = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
 rand = "0.8"
+stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
+stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
 thiserror = "2"

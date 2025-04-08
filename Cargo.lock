@@ -331,12 +331,11 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "falcon-rust"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8518b206828d1e13ff2d3b2c666ab3fa30737ab04b30b5e5508efb9595b0ad36"
 dependencies = [
  "bit-vec",
  "hex",
  "itertools 0.12.1",
+ "lazy_static",
  "num",
  "num-complex",
  "rand",
@@ -351,9 +350,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ark-ff",
+ "bit-vec",
  "cyclotomic-rings",
  "falcon-rust",
+ "itertools 0.12.1",
  "latticefold",
+ "num",
  "num-bigint",
  "num-traits",
  "rand",
@@ -475,6 +477,12 @@ dependencies = [
  "thiserror",
  "toml",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"

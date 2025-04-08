@@ -15,6 +15,49 @@
 ///     sig_bound: 70265242,
 ///     sig_bytelen: 1280,
 /// },
+use crate::{FalconInput, FalconSig};
+use falcon_rust::{
+    encoding::decompress,
+    falcon_field::Felt,
+    falcon512::{PublicKey, Signature},
+    fast_fft::FastFft,
+    polynomial::{Polynomial, hash_to_point}
+};
+use itertools::Itertools;
+
+const N: usize = 512;
+
+pub fn deserialize(m: &[u8], sig: &Signature, pk: &PublicKey) -> (FalconInput, FalconSig) {
+    let r_cat_m = [sig.r.to_vec(), m.to_vec()].concat();
+    let c = hash_to_point(&r_cat_m, N);
+
+    let s2 = decompress(&sig.s, N).unwrap();
+    let s2_ntt = Polynomial::new(s2.iter().map(|a| Felt::new(*a)).collect_vec()).fft();
+    let h_ntt = pk.h.fft();
+    let c_ntt = c.fft();
+
+    // s1 = c - s2 * pk.h;
+    let s1_ntt = c_ntt - s2_ntt.hadamard_mul(&h_ntt);
+    let s1 = s1_ntt.ifft();
+    let s2 = s2_ntt.ifft();
+
+    let p2v = |poly: &Polynomial<Felt>| -> Vec<u128> {
+        poly.coefficients.iter().map(|c| c.value() as u128).collect_vec()
+    };
+
+    let public = FalconInput {
+        h: p2v(&pk.h),
+        c: p2v(&c),
+    };
+
+    let sig = FalconSig {
+        s1: p2v(&s1),
+        s2: p2v(&s2),
+    };
+
+    (public, sig)
+}
+
 #[cfg(test)]
 mod tests {
     use falcon_rust::falcon512;
