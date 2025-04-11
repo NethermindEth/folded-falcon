@@ -1,7 +1,7 @@
 use crate::SplitRing;
 use cyclotomic_rings::rings::SuitableRing;
 use latticefold::arith::r1cs::{Constraint, ConstraintSystem, LinearCombination};
-use stark_rings::PolyRing;
+use stark_rings::{PolyRing, Ring, cyclotomic_ring::CRT};
 use std::ops::Neg;
 
 pub trait CSRing {
@@ -193,8 +193,11 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
             for i in 0..k {
                 for j in 0..k {
                     if (i + j) % k == l {
+                        let w = (i + j) / k;
+                        let mut x = R::CoefficientRepresentation::ZERO;
+                        x.coeffs_mut()[w] = 1u32.into();
                         let aux_idx = aux_index + i * k + j;
-                        let a = LinearCombination::single_term(1u64, s_index + i);
+                        let a = LinearCombination::single_term(x.crt(), s_index + i);
                         let b = LinearCombination::single_term(1u64, sp_index + j);
                         let c = LinearCombination::single_term(1u64, aux_idx);
                         cs.add_constraint(Constraint::new(a, b, c));
@@ -643,14 +646,10 @@ mod tests {
     }
 
     fn splitring_mul_setup(
+        a_r: &[u128],
+        b_r: &[u128],
         k: usize,
     ) -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>, Vec<RqNTT>) {
-        // 5X^10 * 5X^10 = 25X^20
-        let mut a_r = vec![0u128; 512];
-        a_r[10] = 5;
-        let mut b_r = vec![0u128; 512];
-        b_r[10] = 5;
-
         let a: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&a_r).crt();
         let b: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&b_r).crt();
         let c: SplitRing<RqNTT> = a.clone() * b.clone();
@@ -680,6 +679,26 @@ mod tests {
         (a, b, t, aux)
     }
 
+    fn splitring_mul_setup_0() -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>, Vec<RqNTT>) {
+        // 5X^10 * 5X^10 = 25X^20
+        let mut a_r = vec![0u128; 512];
+        a_r[10] = 5;
+        let mut b_r = vec![0u128; 512];
+        b_r[10] = 5;
+
+        splitring_mul_setup(&a_r, &b_r, 32)
+    }
+
+    fn splitring_mul_setup_1() -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>, Vec<RqNTT>) {
+        // X^300 * X^300 = -1X^88
+        let mut a_r = vec![0u128; 512];
+        a_r[300] = 1;
+        let mut b_r = vec![0u128; 512];
+        b_r[300] = 1;
+
+        splitring_mul_setup(&a_r, &b_r, 32)
+    }
+
     #[test]
     fn test_r1cs_splitring_mul_ppw() {
         // Falcon degree = 512, Frog ring of degree 16
@@ -691,7 +710,27 @@ mod tests {
             k,
         )
         .to_r1cs();
-        let (a, b, t, aux) = splitring_mul_setup(k);
+
+        // 5X^10 * 5X^10 = 25X^20
+        let (a, b, t, aux) = splitring_mul_setup_0();
+        let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
+
+        // public inputs s, s'
+        z.extend(a.splits());
+        z.extend(b.splits());
+
+        // constant 1
+        z.push(RqNTT::from(1u32));
+
+        // witness (mul result)
+        z.extend(t);
+
+        z.extend(aux);
+
+        r1cs.check_relation(&z).unwrap();
+
+        // X^300 * X^300 = -1X^88
+        let (a, b, t, aux) = splitring_mul_setup_1();
         let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
 
         // public inputs s, s'
@@ -720,7 +759,7 @@ mod tests {
             k,
         )
         .to_r1cs();
-        let (a, b, t, aux) = splitring_mul_setup(k);
+        let (a, b, t, aux) = splitring_mul_setup_0();
         let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
 
         // public input (mul result)
@@ -749,7 +788,7 @@ mod tests {
             k,
         )
         .to_r1cs();
-        let (a, b, t, aux) = splitring_mul_setup(k);
+        let (a, b, t, aux) = splitring_mul_setup_0();
         let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
 
         // public inputs (s', mul result)
@@ -778,7 +817,7 @@ mod tests {
             k,
         )
         .to_r1cs();
-        let (a, b, t, aux) = splitring_mul_setup(k);
+        let (a, b, t, aux) = splitring_mul_setup_0();
         let mut z = Vec::with_capacity(3 * k + k * k + 1); // inputs + constant 1 + aux + output
 
         // public inputs s'

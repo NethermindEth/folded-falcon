@@ -21,7 +21,7 @@ use falcon_rust::{
     falcon_field::Felt,
     falcon512::{PublicKey, Signature},
     fast_fft::FastFft,
-    polynomial::{Polynomial, hash_to_point}
+    polynomial::{Polynomial, hash_to_point},
 };
 use itertools::Itertools;
 
@@ -42,7 +42,10 @@ pub fn deserialize(m: &[u8], sig: &Signature, pk: &PublicKey) -> (FalconInput, F
     let s2 = s2_ntt.ifft();
 
     let p2v = |poly: &Polynomial<Felt>| -> Vec<u128> {
-        poly.coefficients.iter().map(|c| c.value() as u128).collect_vec()
+        poly.coefficients
+            .iter()
+            .map(|c| c.value() as u128)
+            .collect_vec()
     };
 
     let public = FalconInput {
