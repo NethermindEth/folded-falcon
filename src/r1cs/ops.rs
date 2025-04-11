@@ -650,8 +650,8 @@ mod tests {
         b_r: &[u128],
         k: usize,
     ) -> (SplitRing<RqNTT>, SplitRing<RqNTT>, Vec<RqNTT>, Vec<RqNTT>) {
-        let a: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&a_r).crt();
-        let b: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&b_r).crt();
+        let a: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(a_r).crt();
+        let b: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(b_r).crt();
         let c: SplitRing<RqNTT> = a.clone() * b.clone();
 
         // cross-multiplication terms s_i*s'_j

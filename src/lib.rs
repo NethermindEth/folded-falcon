@@ -1,4 +1,4 @@
-mod falcon;
+pub mod falcon;
 mod lfold;
 pub mod r1cs;
 mod subring;

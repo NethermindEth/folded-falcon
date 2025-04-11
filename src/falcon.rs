@@ -25,9 +25,8 @@ use falcon_rust::{
 };
 use itertools::Itertools;
 
-const N: usize = 512;
-
 pub fn deserialize(m: &[u8], sig: &Signature, pk: &PublicKey) -> (FalconInput, FalconSig) {
+    const N: usize = 512;
     let r_cat_m = [sig.r.to_vec(), m.to_vec()].concat();
     let c = hash_to_point(&r_cat_m, N);
 
