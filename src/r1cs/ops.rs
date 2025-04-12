@@ -58,14 +58,10 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
         let (s_index, sp_index, t_index, one_index) = match (s.ty, sp.ty, t.ty) {
             (InputType::Public, InputType::Public, InputType::Private) => (0, k, 2 * k + 1, 2 * k),
             (InputType::Private, InputType::Private, InputType::Public) => (k + 1, 2 * k + 1, 0, k),
-            (InputType::Public, InputType::Private, InputType::Public)
-            | (InputType::Private, InputType::Public, InputType::Public) => {
-                (0, 2 * k + 1, k, 2 * k)
-            }
-            (InputType::Public, InputType::Private, InputType::Private)
-            | (InputType::Private, InputType::Public, InputType::Private) => {
-                (0, k + 1, 2 * k + 1, k)
-            }
+            (InputType::Public, InputType::Private, InputType::Public) => (0, 2 * k + 1, k, 2 * k),
+            (InputType::Private, InputType::Public, InputType::Public) => (2 * k + 1, 0, k, 2 * k),
+            (InputType::Public, InputType::Private, InputType::Private) => (0, k + 1, 2 * k + 1, k),
+            (InputType::Private, InputType::Public, InputType::Private) => (k + 1, 0, 2 * k + 1, k),
             // All private inputs: should only be used with other systems
             (InputType::Private, InputType::Private, InputType::Private) => {
                 (1, k + 1, 2 * k + 1, 0)
@@ -110,6 +106,10 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
             (InputType::Private, InputType::Public, InputType::Public) => (2 * k + 1, 0, k, 2 * k),
             (InputType::Public, InputType::Private, InputType::Private) => (0, k + 1, 2 * k + 1, k),
             (InputType::Private, InputType::Public, InputType::Private) => (k + 1, 0, 2 * k + 1, k),
+            // All private inputs: should only be used with other systems
+            (InputType::Private, InputType::Private, InputType::Private) => {
+                (1, k + 1, 2 * k + 1, 0)
+            }
             _ => panic!("{s:?} - {sp:?} = {t:?} relation not supported"),
         };
 
@@ -160,14 +160,10 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
         let (s_index, sp_index, t_index, one_index) = match (s.ty, sp.ty, t.ty) {
             (InputType::Public, InputType::Public, InputType::Private) => (0, k, 2 * k + 1, 2 * k),
             (InputType::Private, InputType::Private, InputType::Public) => (k + 1, 2 * k + 1, 0, k),
-            (InputType::Public, InputType::Private, InputType::Public)
-            | (InputType::Private, InputType::Public, InputType::Public) => {
-                (0, 2 * k + 1, k, 2 * k)
-            }
-            (InputType::Public, InputType::Private, InputType::Private)
-            | (InputType::Private, InputType::Public, InputType::Private) => {
-                (0, k + 1, 2 * k + 1, k)
-            }
+            (InputType::Public, InputType::Private, InputType::Public) => (0, 2 * k + 1, k, 2 * k),
+            (InputType::Private, InputType::Public, InputType::Public) => (2 * k + 1, 0, k, 2 * k),
+            (InputType::Public, InputType::Private, InputType::Private) => (0, k + 1, 2 * k + 1, k),
+            (InputType::Private, InputType::Public, InputType::Private) => (k + 1, 0, 2 * k + 1, k),
             // All private inputs: should only be used with other systems
             (InputType::Private, InputType::Private, InputType::Private) => {
                 (1, k + 1, 2 * k + 1, 0)
@@ -251,10 +247,10 @@ impl<R: SuitableRing> CSRing for R {
         let (s_index, sp_index, t_index, one_index) = match (s.ty, sp.ty, t.ty) {
             (InputType::Public, InputType::Public, InputType::Private) => (0, 1, 3, 2),
             (InputType::Private, InputType::Private, InputType::Public) => (2, 3, 0, 1),
-            (InputType::Public, InputType::Private, InputType::Public)
-            | (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
-            (InputType::Public, InputType::Private, InputType::Private)
-            | (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
+            (InputType::Public, InputType::Private, InputType::Public) => (0, 3, 1, 2),
+            (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
+            (InputType::Public, InputType::Private, InputType::Private) => (0, 2, 3, 1),
+            (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
             // All private inputs: should only be used with other systems
             (InputType::Private, InputType::Private, InputType::Private) => (1, 2, 3, 0),
             _ => panic!("{s:?} + {sp:?} = {t:?} relation not supported"),
@@ -285,10 +281,10 @@ impl<R: SuitableRing> CSRing for R {
         let (s_index, sp_index, t_index, one_index) = match (s.ty, sp.ty, t.ty) {
             (InputType::Public, InputType::Public, InputType::Private) => (0, 1, 3, 2),
             (InputType::Private, InputType::Private, InputType::Public) => (2, 3, 0, 1),
-            (InputType::Public, InputType::Private, InputType::Public)
-            | (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
-            (InputType::Public, InputType::Private, InputType::Private)
-            | (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
+            (InputType::Public, InputType::Private, InputType::Public) => (0, 3, 1, 2),
+            (InputType::Private, InputType::Public, InputType::Public) => (3, 0, 1, 2),
+            (InputType::Public, InputType::Private, InputType::Private) => (0, 2, 3, 1),
+            (InputType::Private, InputType::Public, InputType::Private) => (2, 0, 3, 1),
             // All private inputs: should only be used with other systems
             (InputType::Private, InputType::Private, InputType::Private) => (1, 2, 3, 0),
             _ => panic!("{s:?} * {sp:?} = {t:?} relation not supported"),
@@ -321,56 +317,62 @@ impl<R: SuitableRing> CSRing for R {
         // 2d+1: auxiliary variable for sum of squares
         // 2d+2..2d+2+log2(bound): binary decomposition of sum
 
-        cs.vars.add(x.name.clone(), 0, 1);
-        cs.vars.set_one(d);
-        cs.vars.add(format!("{}*{}", x.name, x.name), d + 1, d);
-        cs.vars.add(format!("||{}||^2", x.name), 2 * d + 1, 1);
-        cs.vars
-            .add(format!("{} decomp", x.name), 2 * d + 2, log_bound);
+        let (x_index, aux_index, one_index) = match x.ty {
+            InputType::Public => (0, d + 1, d),
+            InputType::Private => (1, d + 1, 0),
+        };
 
-        cs.ninputs = d; // input polynomial coefficients
-        cs.nauxs = d + 2 + log_bound; // d for squares + sum + binary decomposition
+        cs.vars.add(x.name.clone(), x_index, 1);
+        cs.vars.set_one(one_index);
+        cs.vars.add(format!("{}*{}", x.name, x.name), aux_index, d);
+        cs.vars.add(format!("||{}||^2", x.name), aux_index + d, 1);
+        cs.vars
+            .add(format!("{} decomp", x.name), aux_index + d + 1, log_bound);
+
+        let nvars = d + 1 + d + 1 + log_bound;
+        cs.ninputs = one_index; // input polynomial coefficients
+        cs.nauxs = nvars - one_index; // d for squares + sum + binary decomposition
 
         // For each coefficient c_i, compute c_i * c_i
         for i in 0..d {
-            let a = LinearCombination::single_term(1u64, i); // c_i
-            let b = LinearCombination::single_term(1u64, i); // c_i
-            let c = LinearCombination::single_term(1u64, d + 1 + i); // c_i * c_i
+            let a = LinearCombination::single_term(1u64, x_index + i); // c_i
+            let b = LinearCombination::single_term(1u64, x_index + i); // c_i
+            let c = LinearCombination::single_term(1u64, aux_index + i); // c_i * c_i
             cs.add_constraint(Constraint::new(a, b, c));
         }
 
         // Sum all squared terms
         let mut sum_terms = Vec::with_capacity(d);
         for i in 0..d {
-            sum_terms.push((1u64.into(), d + 1 + i));
+            sum_terms.push((1u64.into(), aux_index + i));
         }
         let sum = LinearCombination::new().add_terms(&sum_terms);
-        let output = LinearCombination::single_term(1u64, 2 * d + 1);
+        let output = LinearCombination::single_term(1u64, aux_index + d);
         // sum * 1 = output
         cs.add_constraint(Constraint::new(
             sum,
-            LinearCombination::single_term(1u64, d),
+            LinearCombination::single_term(1u64, one_index),
             output,
         ));
 
         // Binary decomposition of the sum
         // Each bit must be 0 or 1 (bit * bit = bit)
         for i in 0..log_bound {
-            let bit = LinearCombination::single_term(1u64, 2 * d + 2 + i);
+            let bit = LinearCombination::single_term(1u64, aux_index + d + 1 + i);
             cs.add_constraint(Constraint::new(bit.clone(), bit.clone(), bit));
         }
 
         // Enforce that the sum equals the binary decomposition
         let mut binary_terms: Vec<(R, usize)> = Vec::with_capacity(log_bound);
         for i in 0..log_bound {
-            binary_terms.push(((1u64 << i).into(), 2 * d + 2 + i));
+            binary_terms.push(((1u64 << i).into(), aux_index + d + 1 + i));
         }
         let binary_sum = LinearCombination::new().add_terms(&binary_terms);
 
         // sum = binary_sum
         cs.add_constraint(Constraint::new(
-            LinearCombination::single_term(1u64, 2 * d + 1),
-            LinearCombination::single_term(1u64, d),
+            LinearCombination::single_term(1u64, aux_index + d),
+            LinearCombination::single_term(1u64, one_index),
             binary_sum,
         ));
 
@@ -427,84 +429,95 @@ impl<R: SuitableRing> CSRing for R {
         // 4d+2: auxiliary variable for ||y||^2
         // 4d+3..4d+3+log2(bound): binary decomposition of sum
 
-        cs.vars.add(x.name.clone(), 0, d);
-        cs.vars.add(y.name.clone(), d, d);
-        cs.vars.set_one(2 * d);
-        cs.vars.add(format!("{}*{}", x.name, x.name), 2 * d + 1, d);
-        cs.vars.add(format!("{}*{}", y.name, y.name), 3 * d + 1, d);
-        cs.vars.add(format!("||{}||^2", x.name), 4 * d + 1, 1);
-        cs.vars.add(format!("||{}||^2", y.name), 4 * d + 2, 1);
+        let (x_index, y_index, aux_index, one_index) = match (x.ty, y.ty) {
+            (InputType::Public, InputType::Public) => (0, d, 2 * d + 1, 2 * d),
+            (InputType::Private, InputType::Private) => (1, d + 1, 2 * d + 1, 0),
+            (InputType::Public, InputType::Private) => (0, d + 1, 2 * d + 1, d),
+            (InputType::Private, InputType::Public) => (d + 1, 0, 2 * d + 1, d),
+        };
+
+        cs.vars.add(x.name.clone(), x_index, d);
+        cs.vars.add(y.name.clone(), y_index, d);
+        cs.vars.set_one(one_index);
+        cs.vars.add(format!("{}*{}", x.name, x.name), aux_index, d);
+        cs.vars
+            .add(format!("{}*{}", y.name, y.name), aux_index + d, d);
+        cs.vars
+            .add(format!("||{}||^2", x.name), aux_index + 2 * d, 1);
+        cs.vars
+            .add(format!("||{}||^2", y.name), aux_index + 2 * d + 1, 1);
         cs.vars.add(
             format!("||{},{}||^2 decomp", x.name, y.name),
-            4 * d + 3,
+            aux_index + 2 * d + 2,
             log_bound,
         );
 
-        cs.ninputs = 2 * d;
-        cs.nauxs = 2 * d + 3 + log_bound;
+        let nvars = d + d + 1 + d + d + 1 + 1 + log_bound;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
 
         // For each coefficient x_i, compute x_i * x_i
         for i in 0..d {
-            let a = LinearCombination::single_term(1u64, i); // x_i
-            let b = LinearCombination::single_term(1u64, i); // x_i
-            let c = LinearCombination::single_term(1u64, 2 * d + 1 + i); // x_i * x_i
+            let a = LinearCombination::single_term(1u64, x_index + i); // x_i
+            let b = LinearCombination::single_term(1u64, x_index + i); // x_i
+            let c = LinearCombination::single_term(1u64, aux_index + i); // x_i * x_i
             cs.add_constraint(Constraint::new(a, b, c));
         }
 
         // For each coefficient y_i, compute y_i * y_i
         for i in 0..d {
-            let a = LinearCombination::single_term(1u64, d + i); // y_i
-            let b = LinearCombination::single_term(1u64, d + i); // y_i
-            let c = LinearCombination::single_term(1u64, 3 * d + 1 + i); // y_i * y_i
+            let a = LinearCombination::single_term(1u64, y_index + i); // y_i
+            let b = LinearCombination::single_term(1u64, y_index + i); // y_i
+            let c = LinearCombination::single_term(1u64, aux_index + d + i); // y_i * y_i
             cs.add_constraint(Constraint::new(a, b, c));
         }
 
         // sum of squares for x
         let mut sum_terms_x = Vec::with_capacity(d);
         for i in 0..d {
-            sum_terms_x.push((1u64.into(), 2 * d + 1 + i));
+            sum_terms_x.push((1u64.into(), aux_index + i));
         }
         let sum_x = LinearCombination::new().add_terms(&sum_terms_x);
-        let output_x = LinearCombination::single_term(1u64, 4 * d + 1);
+        let output_x = LinearCombination::single_term(1u64, aux_index + 2 * d);
         cs.add_constraint(Constraint::new(
             sum_x,
-            LinearCombination::single_term(1u64, 2 * d),
+            LinearCombination::single_term(1u64, one_index),
             output_x,
         ));
 
         // sum of squares for y
         let mut sum_terms_y = Vec::with_capacity(d);
         for i in 0..d {
-            sum_terms_y.push((1u64.into(), 3 * d + 1 + i));
+            sum_terms_y.push((1u64.into(), aux_index + d + i));
         }
         let sum_y = LinearCombination::new().add_terms(&sum_terms_y);
-        let output_y = LinearCombination::single_term(1u64, 4 * d + 2);
+        let output_y = LinearCombination::single_term(1u64, aux_index + 2 * d + 1);
         cs.add_constraint(Constraint::new(
             sum_y,
-            LinearCombination::single_term(1u64, 2 * d),
+            LinearCombination::single_term(1u64, one_index),
             output_y,
         ));
 
         // binary decomposition of the sum
         for i in 0..log_bound {
-            let bit = LinearCombination::single_term(1u64, 4 * d + 3 + i);
+            let bit = LinearCombination::single_term(1u64, aux_index + 2 * d + 2 + i);
             cs.add_constraint(Constraint::new(bit.clone(), bit.clone(), bit));
         }
 
         // total sum = binary_sum
         let mut binary_terms: Vec<(R, usize)> = Vec::with_capacity(log_bound);
         for i in 0..log_bound {
-            binary_terms.push(((1u64 << i).into(), 4 * d + 3 + i));
+            binary_terms.push(((1u64 << i).into(), aux_index + 2 * d + 2 + i));
         }
         let binary_sum = LinearCombination::new().add_terms(&binary_terms);
 
         // ||x||^2 + ||y||^2 = binary_sum
         let total_sum = LinearCombination::new()
-            .add_term(1u64, 4 * d + 1) // ||x||^2
-            .add_term(1u64, 4 * d + 2); // ||y||^2
+            .add_term(1u64, aux_index + 2 * d) // ||x||^2
+            .add_term(1u64, aux_index + 2 * d + 1); // ||y||^2
         cs.add_constraint(Constraint::new(
             total_sum,
-            LinearCombination::single_term(1u64, 2 * d),
+            LinearCombination::single_term(1u64, one_index),
             binary_sum,
         ));
 
