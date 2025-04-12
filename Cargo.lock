@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "cyclotomic-rings"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#0aa25fbb2824c9737e410208560516aca62bf031"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#f9e750e640fabc40bfc407bd9bd56637f1a91612"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",
@@ -331,6 +331,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "falcon-rust"
 version = "0.1.2"
+source = "git+https://github.com/v0-e/falcon-rust?branch=pub#603c901b3879f70b4ee9d307e76a9a7f790065c0"
 dependencies = [
  "bit-vec",
  "hex",
@@ -457,7 +458,7 @@ dependencies = [
 [[package]]
 name = "latticefold"
 version = "0.1.0"
-source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#0aa25fbb2824c9737e410208560516aca62bf031"
+source = "git+https://github.com/nethermindeth/latticefold?branch=ev%2Fr1cs-builder#f9e750e640fabc40bfc407bd9bd56637f1a91612"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ff",

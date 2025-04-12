@@ -27,66 +27,133 @@ pub struct FalconInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
+    use crate::{SplitRing, SplitRingPoly, falcon::deserialize, lfold::DP, r1cs::ZBuilder};
+    use anyhow::Result;
+    use cyclotomic_rings::rings::{
+        FrogChallengeSet as CS, FrogRingNTT as RqNTT, FrogRingPoly as RqPoly,
+    };
+    use falcon_rust::falcon512;
     use latticefold::{
         arith::{Arith, CCCS, CCS, Witness},
         commitment::AjtaiCommitmentScheme,
         decomposition_parameters::DecompositionParams,
     };
-    #[derive(Clone)]
-    pub struct DP {}
-    impl DecompositionParams for DP {
-        const B: u128 = 1 << 15;
-        const L: usize = 5;
-        const B_SMALL: usize = 2;
-        const K: usize = 15;
-    }
-    const C: usize = 6;
+    use rand::Rng;
+    use stark_rings::{PolyRing, Ring, cyclotomic_ring::CRT};
+
+    const C: usize = 157;
     const W: usize = WIT_LEN * DP::L;
-    const WIT_LEN: usize = 3;
+    const WIT_LEN: usize = 3274;
     type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 
-    fn dummy_comp(ajtai: &Ajtai) -> LFComp<RqNTT, C> {
-        let z = &[
-            RqNTT::from(7u32),
-            RqNTT::from(3u32),
-            RqNTT::from(1u32),
-            RqNTT::from(1u32),
-            RqNTT::from(2u32),
-            RqNTT::from(6u32),
-        ];
-        let ccs = CCS::from_r1cs_padded(r1cs::signature_verification_cs().to_r1cs(), 2, DP::L);
-        ccs.check_relation(z).expect("R1CS invalid!");
+    fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
+        let msg = b"Hello, world!";
+        let (sk, pk) = falcon512::keygen(rand::thread_rng().r#gen());
+        let sig = falcon512::sign(msg, &sk);
 
-        let wit: Witness<RqNTT> = Witness::from_w_ccs::<DP>(vec![
-            RqNTT::from(1u32),
-            RqNTT::from(2u32),
-            RqNTT::from(6u32),
-        ]);
+        let (x, w) = deserialize(msg, &sig, &pk);
+
+        let d = 512;
+        let k = 32;
+        let log_bound = 40;
+
+        let (r1cs, map) = r1cs::signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
+
+        let h_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&x.h).crt();
+        let s2_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&w.s2).crt();
+        let s1_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&w.s1).crt();
+        let c_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&x.c).crt();
+        let s2h = s2_r.clone() * h_r.clone();
+        let s1ps2h = s1_r.clone() + s2h.clone();
+        let v_r = s1ps2h.clone().icrt().lift(FALCON_MOD).crt();
+
+        let s2h_cross = (0..k * k)
+            .map(|idx| {
+                let i = idx / k;
+                let j = idx % k;
+                let w = (i + j) / k;
+                let mut x = RqPoly::ZERO;
+                x.coeffs_mut()[w] = 1u32.into();
+                s2_r.splits()[i] * h_r.splits()[j] * x.crt()
+            })
+            .collect::<Vec<_>>();
+
+        let s1_p =
+            w.s1.iter()
+                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .collect::<Vec<_>>();
+        let s2_p =
+            w.s2.iter()
+                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .collect::<Vec<_>>();
+
+        let s1_norm = w.s1.iter().map(|c| c * c).sum::<u128>();
+        let s2_norm = w.s2.iter().map(|c| c * c).sum::<u128>();
+        let norm = s1_norm + s2_norm;
+
+        let mut remaining = norm;
+        let mut norm_decomp = vec![RqNTT::from(0u32); log_bound];
+        for (i, c) in norm_decomp.iter_mut().enumerate() {
+            *c = if (remaining & (1 << i)) != 0 {
+                remaining -= 1 << i;
+                RqNTT::from(1u32)
+            } else {
+                RqNTT::from(0u32)
+            };
+        }
+
+        let z = ZBuilder::<RqNTT>::new(map)
+            .set("h", h_r.splits())?
+            .set("c", c_r.splits())?
+            .set("s1", s1_r.splits())?
+            .set("s2", s2_r.splits())?
+            .set("s2h", s2h.splits())?
+            .set("s2*h", &s2h_cross)?
+            .set("v", v_r.splits())?
+            .set("s1+s2h", s1ps2h.splits())?
+            .set("s1p", &s1_p)?
+            .set("s2p", &s2_p)?
+            .set("s1p*s1p", &s1_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+            .set("s2p*s2p", &s2_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+            .set("||s1p||^2", &[RqNTT::from(s1_norm)])?
+            .set("||s2p||^2", &[RqNTT::from(s2_norm)])?
+            .set("||s1p,s2p||^2 decomp", &norm_decomp)?
+            .build()?;
+
+        let x_len = r1cs.l;
+        //println!("WIT_LEN: {}", z.len() - x_len - 1);
+        r1cs.check_relation(&z)?;
+
+        let ccs = CCS::from_r1cs_padded(r1cs, W, DP::L);
+        ccs.check_relation(&z)?;
+
+        let wit: Witness<RqNTT> = Witness::from_w_ccs::<DP>(z[x_len + 1..].to_vec());
         let cm_i = CCCS {
-            cm: wit.commit::<C, W, DP>(ajtai).unwrap(),
-            x_ccs: vec![RqNTT::from(7u32), RqNTT::from(3u32)],
+            cm: wit.commit::<C, W, DP>(ajtai)?,
+            x_ccs: z[..x_len].to_vec(),
         };
 
-        LFComp {
+        Ok(LFComp {
             witness: wit,
             cccs: cm_i,
             ccs,
-        }
+        })
     }
 
     #[test]
-    fn test_sig_fold() {
+    fn test_sig_fold() -> Result<()> {
         let mut rng = rand::thread_rng();
 
         let scheme = Ajtai::rand(&mut rng);
-        let comp0 = dummy_comp(&scheme);
-        let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0).unwrap();
-        let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof).unwrap();
+        let comp0 = dummy_comp(&scheme)?;
+        let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0)?;
+        let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof)?;
         for _ in 0..3 {
-            let comp = dummy_comp(agg.ajtai());
-            let proof = agg.fold(&comp).unwrap();
-            ctx.verify(&comp, &proof).unwrap();
+            let comp = dummy_comp(agg.ajtai())?;
+            let proof = agg.fold(&comp)?;
+            ctx.verify(&comp, &proof)?;
         }
+
+        Ok(())
     }
 }

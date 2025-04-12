@@ -17,10 +17,10 @@ use latticefold::{
 #[derive(Clone)]
 pub struct DP {}
 impl DecompositionParams for DP {
-    const B: u128 = 1 << 15;
-    const L: usize = 5;
+    const B: u128 = 17179869184;
+    const L: usize = 9;
     const B_SMALL: usize = 2;
-    const K: usize = 15;
+    const K: usize = 34;
 }
 type TS<R, CS> = PoseidonTranscript<R, CS>;
 type Ajtai<R, const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, R>;
