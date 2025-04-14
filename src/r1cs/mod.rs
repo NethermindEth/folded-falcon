@@ -10,6 +10,12 @@ use latticefold::arith::r1cs::{
     Constraint, ConstraintSystem, LinearCombination, R1CS, VariableMap,
 };
 
+/// Falcon signature verification R1CS.
+///
+/// Arguments:
+/// - `k` is the number of split rings, if a `SplitRing` is used in the constraint system.
+/// - `d` is the degree of the original Falcon ring (512 or 1024).
+/// - `log_bound` is the log-2 of the norm bound of the signature components $(s1, s2)$.
 pub fn signature_verification_r1cs<R: CSRing>(
     k: usize,
     d: usize,
