@@ -200,7 +200,7 @@ mod tests {
 
         let d = 512;
         let k = 32;
-        let log_bound = 40;
+        let log_bound = 26; // ceil(log2(34034726))
 
         let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
 
@@ -226,15 +226,28 @@ mod tests {
 
         let s1_p =
             w.s1.iter()
-                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .map(|c| {
+                    let s = if *c > FALCON_MOD / 2 {
+                        FALCON_MOD - *c
+                    } else {
+                        *c
+                    };
+                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
+                })
                 .collect::<Vec<_>>();
         let s2_p =
             w.s2.iter()
-                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .map(|c| {
+                    let s = if *c > FALCON_MOD / 2 {
+                        FALCON_MOD - *c
+                    } else {
+                        *c
+                    };
+                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
+                })
                 .collect::<Vec<_>>();
 
-        let s1_norm = w.s1.iter().map(|c| c * c).sum::<u128>();
-        let s2_norm = w.s2.iter().map(|c| c * c).sum::<u128>();
+        let (s1_norm, s2_norm) = w.norms_squared();
         let norm = s1_norm + s2_norm;
 
         let mut remaining = norm;

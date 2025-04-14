@@ -40,6 +40,19 @@ pub fn deserialize(m: &[u8], sig: &Signature, pk: &PublicKey) -> (FalconInput, F
     let s1 = s1_ntt.ifft();
     let s2 = s2_ntt.ifft();
 
+    let length_squared = s1
+        .coefficients
+        .iter()
+        .map(|i| i.balanced_value() as i64)
+        .map(|i| (i * i))
+        .sum::<i64>()
+        + s2.coefficients
+            .iter()
+            .map(|&i| i.balanced_value() as i64)
+            .map(|i| (i * i))
+            .sum::<i64>();
+    dbg!(length_squared);
+
     let p2v = |poly: &Polynomial<Felt>| -> Vec<u128> {
         poly.coefficients
             .iter()

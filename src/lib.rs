@@ -24,6 +24,24 @@ pub struct FalconInput {
     pub c: Vec<u128>,
 }
 
+impl FalconSig {
+    /// Calculate the l2-norms (squared) of the signature components.
+    pub fn norms_squared(&self) -> (u128, u128) {
+        let balance = |c: &u128| -> u128 {
+            if *c > FALCON_MOD / 2 {
+                FALCON_MOD - c
+            } else {
+                *c
+            }
+        };
+
+        let s1_norm = self.s1.iter().map(balance).map(|c| c * c).sum::<u128>();
+        let s2_norm = self.s2.iter().map(balance).map(|c| c * c).sum::<u128>();
+
+        (s1_norm, s2_norm)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43,7 +61,7 @@ mod tests {
 
     const C: usize = 157;
     const W: usize = WIT_LEN * DP::L;
-    const WIT_LEN: usize = 3274;
+    const WIT_LEN: usize = 3260;
     type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 
     fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
@@ -55,7 +73,7 @@ mod tests {
 
         let d = 512;
         let k = 32;
-        let log_bound = 40;
+        let log_bound = 26; // ceil(log2(34034726))
 
         let (r1cs, map) = r1cs::signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
 
@@ -80,15 +98,28 @@ mod tests {
 
         let s1_p =
             w.s1.iter()
-                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .map(|c| {
+                    let s = if *c > FALCON_MOD / 2 {
+                        FALCON_MOD - *c
+                    } else {
+                        *c
+                    };
+                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
+                })
                 .collect::<Vec<_>>();
         let s2_p =
             w.s2.iter()
-                .map(|c| RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(*c)))
+                .map(|c| {
+                    let s = if *c > FALCON_MOD / 2 {
+                        FALCON_MOD - *c
+                    } else {
+                        *c
+                    };
+                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
+                })
                 .collect::<Vec<_>>();
 
-        let s1_norm = w.s1.iter().map(|c| c * c).sum::<u128>();
-        let s2_norm = w.s2.iter().map(|c| c * c).sum::<u128>();
+        let (s1_norm, s2_norm) = w.norms_squared();
         let norm = s1_norm + s2_norm;
 
         let mut remaining = norm;
