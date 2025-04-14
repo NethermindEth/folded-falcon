@@ -48,7 +48,6 @@ mod tests {
     use crate::{
         SplitRing,
         falcon::deserialize,
-        lfold::DP,
         r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
     };
     use anyhow::Result;
@@ -60,6 +59,15 @@ mod tests {
         decomposition_parameters::DecompositionParams,
     };
     use rand::Rng;
+
+    #[derive(Clone)]
+    pub struct DP {}
+    impl DecompositionParams for DP {
+        const B: u128 = 8388608;
+        const L: usize = 3;
+        const B_SMALL: usize = 2;
+        const K: usize = 23;
+    }
 
     const C: usize = 157;
     const W: usize = WIT_LEN * DP::L;
@@ -106,8 +114,8 @@ mod tests {
 
         let scheme = Ajtai::rand(&mut rng);
         let comp0 = dummy_comp(&scheme)?;
-        let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0)?;
-        let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof)?;
+        let (mut agg, proof) = LFAcc::<RqNTT, DP, CS, C, W>::init(scheme, &comp0)?;
+        let mut ctx = LFVerifier::<RqNTT, DP, CS, C>::init(&comp0, &proof)?;
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai())?;
             let proof = agg.fold(&comp)?;

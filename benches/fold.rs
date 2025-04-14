@@ -25,10 +25,10 @@ type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 #[derive(Clone)]
 pub struct DP {}
 impl DecompositionParams for DP {
-    const B: u128 = 17179869184;
-    const L: usize = 9;
+    const B: u128 = 8388608;
+    const L: usize = 3;
     const B_SMALL: usize = 2;
-    const K: usize = 34;
+    const K: usize = 23;
 }
 
 fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
@@ -70,7 +70,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let scheme = Ajtai::rand(&mut rng);
     let comp0 = dummy_comp(&scheme).unwrap();
-    let (mut agg, proof) = LFAcc::<RqNTT, CS, C, W>::init(scheme, &comp0).unwrap();
+    let (mut agg, proof) = LFAcc::<RqNTT, DP, CS, C, W>::init(scheme, &comp0).unwrap();
 
     // Prover / Fold
     let comp = dummy_comp(agg.ajtai()).unwrap();
@@ -82,7 +82,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     // Verifier
-    let mut ctx = LFVerifier::<RqNTT, CS, C>::init(&comp0, &proof).unwrap();
+    let mut ctx = LFVerifier::<RqNTT, DP, CS, C>::init(&comp0, &proof).unwrap();
     c.bench_function("verify", |b| {
         b.iter_batched(
             || agg0.fold(&comp).unwrap(),
