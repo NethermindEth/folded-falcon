@@ -45,11 +45,14 @@ impl FalconSig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SplitRing, SplitRingPoly, falcon::deserialize, lfold::DP, r1cs::ZBuilder};
-    use anyhow::Result;
-    use cyclotomic_rings::rings::{
-        FrogChallengeSet as CS, FrogRingNTT as RqNTT, FrogRingPoly as RqPoly,
+    use crate::{
+        SplitRing,
+        falcon::deserialize,
+        lfold::DP,
+        r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
     };
+    use anyhow::Result;
+    use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
     use falcon_rust::falcon512;
     use latticefold::{
         arith::{Arith, CCCS, CCS, Witness},
@@ -57,7 +60,6 @@ mod tests {
         decomposition_parameters::DecompositionParams,
     };
     use rand::Rng;
-    use stark_rings::{PolyRing, Ring, cyclotomic_ring::CRT};
 
     const C: usize = 157;
     const W: usize = WIT_LEN * DP::L;
@@ -75,81 +77,8 @@ mod tests {
         let k = 32;
         let log_bound = 26; // ceil(log2(34034726))
 
-        let (r1cs, map) = r1cs::signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
-
-        let h_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&x.h).crt();
-        let s2_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&w.s2).crt();
-        let s1_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&w.s1).crt();
-        let c_r: SplitRing<RqNTT> = SplitRingPoly::<RqPoly>::from_r(&x.c).crt();
-        let s2h = s2_r.clone() * h_r.clone();
-        let s1ps2h = s1_r.clone() + s2h.clone();
-        let v_r = s1ps2h.clone().icrt().lift(FALCON_MOD).crt();
-
-        let s2h_cross = (0..k * k)
-            .map(|idx| {
-                let i = idx / k;
-                let j = idx % k;
-                let w = (i + j) / k;
-                let mut x = RqPoly::ZERO;
-                x.coeffs_mut()[w] = 1u32.into();
-                s2_r.splits()[i] * h_r.splits()[j] * x.crt()
-            })
-            .collect::<Vec<_>>();
-
-        let s1_p =
-            w.s1.iter()
-                .map(|c| {
-                    let s = if *c > FALCON_MOD / 2 {
-                        FALCON_MOD - *c
-                    } else {
-                        *c
-                    };
-                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
-                })
-                .collect::<Vec<_>>();
-        let s2_p =
-            w.s2.iter()
-                .map(|c| {
-                    let s = if *c > FALCON_MOD / 2 {
-                        FALCON_MOD - *c
-                    } else {
-                        *c
-                    };
-                    RqNTT::from_scalar(<RqNTT as PolyRing>::BaseRing::from(s))
-                })
-                .collect::<Vec<_>>();
-
-        let (s1_norm, s2_norm) = w.norms_squared();
-        let norm = s1_norm + s2_norm;
-
-        let mut remaining = norm;
-        let mut norm_decomp = vec![RqNTT::from(0u32); log_bound];
-        for (i, c) in norm_decomp.iter_mut().enumerate() {
-            *c = if (remaining & (1 << i)) != 0 {
-                remaining -= 1 << i;
-                RqNTT::from(1u32)
-            } else {
-                RqNTT::from(0u32)
-            };
-        }
-
-        let z = ZBuilder::<RqNTT>::new(map)
-            .set("h", h_r.splits())?
-            .set("c", c_r.splits())?
-            .set("s1", s1_r.splits())?
-            .set("s2", s2_r.splits())?
-            .set("s2h", s2h.splits())?
-            .set("s2*h", &s2h_cross)?
-            .set("v", v_r.splits())?
-            .set("s1+s2h", s1ps2h.splits())?
-            .set("s1p", &s1_p)?
-            .set("s2p", &s2_p)?
-            .set("s1p*s1p", &s1_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
-            .set("s2p*s2p", &s2_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
-            .set("||s1p||^2", &[RqNTT::from(s1_norm)])?
-            .set("||s2p||^2", &[RqNTT::from(s2_norm)])?
-            .set("||s1p,s2p||^2 decomp", &norm_decomp)?
-            .build()?;
+        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
+        let z = signature_verification_splitring_z(&x, &w, log_bound, map)?;
 
         let x_len = r1cs.l;
         //println!("WIT_LEN: {}", z.len() - x_len - 1);
