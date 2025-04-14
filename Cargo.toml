@@ -18,3 +18,10 @@ rand = "0.8"
 stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
 stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
 thiserror = "2"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "fold"
+harness = false
