@@ -1,7 +1,12 @@
 use crate::SplitRing;
 use cyclotomic_rings::rings::SuitableRing;
 use latticefold::arith::r1cs::{Constraint, ConstraintSystem, LinearCombination};
-use stark_rings::{PolyRing, Ring, cyclotomic_ring::CRT};
+use stark_rings::{
+    PolyRing, Ring,
+    cyclotomic_ring::{
+        CRT, CyclotomicConfig, CyclotomicPolyRingGeneral, CyclotomicPolyRingNTTGeneral, ICRT,
+    },
+};
 use std::ops::Neg;
 
 pub trait CSRing {
@@ -522,6 +527,31 @@ impl<R: SuitableRing> CSRing for R {
         ));
 
         cs
+    }
+
+pub trait UnitMonomial {
+    fn unit_monomial(d: usize) -> Self;
+}
+
+impl<C: CyclotomicConfig<N>, const N: usize, const D: usize> UnitMonomial
+    for CyclotomicPolyRingNTTGeneral<C, N, D>
+where
+    Self: ICRT<ICRTForm: PolyRing + CRT<CRTForm = Self>>,
+{
+    fn unit_monomial(d: usize) -> Self {
+        let mut mono = Self::ZERO.icrt();
+        mono.coeffs_mut()[d] = <<Self as ICRT>::ICRTForm as PolyRing>::BaseRing::ONE;
+        mono.crt()
+    }
+}
+
+impl<C: CyclotomicConfig<N>, const N: usize, const D: usize> UnitMonomial
+    for CyclotomicPolyRingGeneral<C, N, D>
+{
+    fn unit_monomial(d: usize) -> Self {
+        let mut mono = Self::ZERO;
+        mono.coeffs_mut()[d] = <Self as PolyRing>::BaseRing::ONE;
+        mono
     }
 }
 
