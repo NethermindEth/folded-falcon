@@ -40,9 +40,12 @@ pub trait CSRing {
         d: usize,
         log_bound: usize,
     ) -> ConstraintSystem<Self::Base>;
+
+    /// CS stating that `x` is composed by `d` `coeffs`.
+    fn cs_combine(x: Input, coeffs: Input, d: usize, k: usize) -> ConstraintSystem<Self::Base>;
 }
 
-impl<R: SuitableRing> CSRing for SplitRing<R> {
+impl<R: SuitableRing + UnitMonomial> CSRing for SplitRing<R> {
     type Base = R;
 
     fn cs_add(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<R> {
@@ -148,20 +151,6 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
     fn cs_mul(s: Input, sp: Input, t: Input, k: usize) -> ConstraintSystem<R> {
         let mut cs = ConstraintSystem::<R>::new();
 
-        // Variables (one witness ring):
-        // 0..k: public ring
-        // k..2k: public ring
-        // 2k: constant 1
-        // 2k+1..3k+1: private ring
-        // 3k+1..3k+1+k*k: auxiliary variables for cross-multiplications
-
-        // Variables (two witness rings):
-        // 0..k: public ring
-        // k: constant 1
-        // k+1..2k+1: private ring
-        // 2k+1..3k+1: private ring
-        // 3k+1..3k+1+k*k: auxiliary variables for cross-multiplications
-
         let (s_index, sp_index, t_index, one_index) = match (s.ty, sp.ty, t.ty) {
             (InputType::Public, InputType::Public, InputType::Private) => (0, k, 2 * k + 1, 2 * k),
             (InputType::Private, InputType::Private, InputType::Public) => (k + 1, 2 * k + 1, 0, k),
@@ -241,9 +230,51 @@ impl<R: SuitableRing> CSRing for SplitRing<R> {
     ) -> ConstraintSystem<Self::Base> {
         <Self::Base as CSRing>::cs_norm_bound_xy(x, y, d, log_bound)
     }
+
+    fn cs_combine(x: Input, coeffs: Input, d: usize, k: usize) -> ConstraintSystem<Self::Base> {
+        let mut cs = ConstraintSystem::<R>::new();
+        let b = d / k;
+
+        let (x_index, coeffs_index, one_index) = match (x.ty, coeffs.ty) {
+            (InputType::Public, InputType::Public) => (0, k, d + 1),
+            (InputType::Public, InputType::Private) => (0, k + 1, k),
+            (InputType::Private, InputType::Public) => (d + 1, 0, d),
+            (InputType::Private, InputType::Private) => (1, k + 1, 0),
+        };
+
+        cs.vars.add(x.name.clone(), x_index, k);
+        cs.vars.add(coeffs.name.clone(), coeffs_index, k * d);
+        cs.vars.set_one(one_index);
+
+        let nvars = k + d + 1;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
+
+        // coeffs in order of x_0, x_1, ..., x_{k-1}
+        // splitring0 = [x_0, x_k, x_{2k}, ..., x_{(d-1)k}]
+        // splitring1 = [x_1, x_{k+1}, x_{2k+1}, ..., x_{(d-1)k+1}]
+        // ...
+
+        // for each splitring, add a constraint
+        for i in 0..k {
+            let mut sum_terms = Vec::new();
+            for j in 0..b {
+                sum_terms.push((R::unit_monomial(j), coeffs_index + j * k + i));
+            }
+            let sum = LinearCombination::new().add_terms(&sum_terms);
+            let output = LinearCombination::single_term(1u64, x_index + i);
+            cs.add_constraint(Constraint::new(
+                sum,
+                LinearCombination::single_term(1u64, one_index),
+                output,
+            ));
+        }
+
+        cs
+    }
 }
 
-impl<R: SuitableRing> CSRing for R {
+impl<R: SuitableRing + UnitMonomial> CSRing for R {
     type Base = R;
 
     fn cs_add(s: Input, sp: Input, t: Input, _k: usize) -> ConstraintSystem<R> {
@@ -528,6 +559,45 @@ impl<R: SuitableRing> CSRing for R {
 
         cs
     }
+
+    fn cs_combine(x: Input, coeffs: Input, d: usize, _k: usize) -> ConstraintSystem<Self::Base> {
+        let mut cs = ConstraintSystem::<R>::new();
+
+        let (x_index, coeffs_index, one_index) = match (x.ty, coeffs.ty) {
+            (InputType::Public, InputType::Public) => (0, 1, d + 1),
+            (InputType::Public, InputType::Private) => (0, 2, 1),
+            (InputType::Private, InputType::Public) => (d + 1, 0, d),
+            (InputType::Private, InputType::Private) => (1, 2, 0),
+        };
+
+        cs.vars.add(x.name.clone(), x_index, 1);
+        cs.vars.add(coeffs.name.clone(), coeffs_index, d);
+        cs.vars.set_one(one_index);
+
+        let nvars = d + 1 + 1;
+        cs.ninputs = one_index;
+        cs.nauxs = nvars - one_index;
+
+        // sum of id * coeffs[i] = x
+        // where id is a polynomial with a single coefficient 1 at position i
+        let mut sum_terms = Vec::new();
+        for i in 0..d {
+            sum_terms.push((R::unit_monomial(i), coeffs_index + i));
+        }
+
+        let sum = LinearCombination::new().add_terms(&sum_terms);
+        let output = LinearCombination::single_term(1u64, x_index);
+
+        // sum * 1 = output
+        cs.add_constraint(Constraint::new(
+            sum,
+            LinearCombination::single_term(1u64, one_index),
+            output,
+        ));
+
+        cs
+    }
+}
 
 pub trait UnitMonomial {
     fn unit_monomial(d: usize) -> Self;
@@ -1098,6 +1168,25 @@ mod tests {
         }
 
         r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_ring_combine() {
+        let r1cs = RqNTT::cs_combine(Input::private("x"), Input::public("coeffs"), 4, 0).to_r1cs();
+        let mut x = RqPoly::ZERO;
+        x.coeffs_mut()[0] = 10u32.into();
+        x.coeffs_mut()[1] = 5u32.into();
+        x.coeffs_mut()[3] = 30u32.into();
+
+        let z = &[
+            RqNTT::from(10u32),
+            RqNTT::from(5u32),
+            RqNTT::from(0u32),
+            RqNTT::from(30u32),
+            RqNTT::ONE,
+            x.crt(),
+        ];
+        r1cs.check_relation(z).unwrap();
     }
 
     #[test]
