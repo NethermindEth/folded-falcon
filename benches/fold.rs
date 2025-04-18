@@ -17,7 +17,7 @@ use latticefold::{
 };
 use rand::Rng;
 
-const C: usize = 157;
+const C: usize = 38;
 const W: usize = WIT_LEN * DP::L;
 const WIT_LEN: usize = 3260;
 type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
@@ -25,10 +25,10 @@ type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 #[derive(Clone)]
 pub struct DP {}
 impl DecompositionParams for DP {
-    const B: u128 = 8388608;
-    const L: usize = 3;
+    const B: u128 = 131072;
+    const L: usize = 4;
     const B_SMALL: usize = 2;
-    const K: usize = 23;
+    const K: usize = 17;
 }
 
 fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
