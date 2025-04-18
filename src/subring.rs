@@ -2,7 +2,7 @@ use cyclotomic_rings::rings::SuitableRing;
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
 use stark_rings::{
-    PolyRing, Ring,
+    OverField, PolyRing, Ring,
     balanced_decomposition::convertible_ring::ConvertibleRing,
     cyclotomic_ring::{CRT, ICRT},
 };
@@ -10,16 +10,16 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 /// A ring R's decomposed representation into subrings S. Elements are in coefficient form.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SplitRingPoly<S: PolyRing>(Vec<S>);
+pub struct SplitRingPoly<S: OverField>(Vec<S>);
 
 /// A ring R's decomposed representation into subrings S. Elements are in NTT form, employable in
 /// LatticeFold.
 /// This ring representation does not implement `SuitableRing` as some of the traits required do
-/// not particularly fit the vector of NTT representations structure, e.g., `PolyRing`.
+/// not particularly fit the vector of NTT representations structure, e.g., `OverField`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SplitRing<U: SuitableRing>(Vec<U>);
 
-impl<S: stark_rings::OverField> SplitRingPoly<S> {
+impl<S: OverField> SplitRingPoly<S> {
     /// Maps an element from ring R of degree d*k to k elements in subring S of degree d
     ///
     /// Bijection ϕ: R → S^k where:
@@ -118,6 +118,23 @@ impl<S: stark_rings::OverField> SplitRingPoly<S> {
         Self(v)
     }
 
+    /// Centers self coefficients to [-p/2, p/2] around the self's modulus
+    pub fn center(&mut self, p: u128)
+    where
+        S::BaseRing: ConvertibleRing,
+    {
+        let half_p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p / 2);
+        let p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p);
+        self.0.iter_mut().for_each(|split| {
+            split.coeffs_mut().iter_mut().for_each(|c| {
+                let c_int = Into::<<S::BaseRing as ConvertibleRing>::UnsignedInt>::into(*c);
+                if c_int > half_p {
+                    *c = -S::BaseRing::from(p.clone() - c_int);
+                }
+            })
+        });
+    }
+
     pub fn into_vec(self) -> Vec<S> {
         self.0
     }
@@ -142,7 +159,7 @@ impl<U: SuitableRing> SplitRing<U> {
     }
 }
 
-impl<S: PolyRing> AddAssign for SplitRingPoly<S> {
+impl<S: OverField> AddAssign for SplitRingPoly<S> {
     fn add_assign(&mut self, rhs: Self) {
         self.0
             .iter_mut()
@@ -151,7 +168,7 @@ impl<S: PolyRing> AddAssign for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing> Add for SplitRingPoly<S> {
+impl<S: OverField> Add for SplitRingPoly<S> {
     type Output = Self;
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
@@ -159,7 +176,7 @@ impl<S: PolyRing> Add for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing> SubAssign for SplitRingPoly<S> {
+impl<S: OverField> SubAssign for SplitRingPoly<S> {
     fn sub_assign(&mut self, rhs: Self) {
         self.0
             .iter_mut()
@@ -168,7 +185,7 @@ impl<S: PolyRing> SubAssign for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing> Sub for SplitRingPoly<S> {
+impl<S: OverField> Sub for SplitRingPoly<S> {
     type Output = Self;
     fn sub(mut self, rhs: Self) -> Self::Output {
         self -= rhs;
@@ -176,7 +193,7 @@ impl<S: PolyRing> Sub for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing> MulAssign for SplitRingPoly<S> {
+impl<S: OverField> MulAssign for SplitRingPoly<S> {
     fn mul_assign(&mut self, rhs: Self) {
         let k = self.0.len();
 
@@ -202,7 +219,7 @@ impl<S: PolyRing> MulAssign for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing> Mul for SplitRingPoly<S> {
+impl<S: OverField> Mul for SplitRingPoly<S> {
     type Output = Self;
 
     fn mul(mut self, rhs: Self) -> Self::Output {
@@ -211,13 +228,13 @@ impl<S: PolyRing> Mul for SplitRingPoly<S> {
     }
 }
 
-impl<S: PolyRing + for<'a> MulAssign<&'a u128>> MulAssign<&u128> for SplitRingPoly<S> {
+impl<S: OverField + for<'a> MulAssign<&'a u128>> MulAssign<&u128> for SplitRingPoly<S> {
     fn mul_assign(&mut self, rhs: &u128) {
         self.0.iter_mut().for_each(|s_i| *s_i *= rhs);
     }
 }
 
-impl<S: PolyRing + for<'a> MulAssign<&'a u128>> Mul<&u128> for SplitRingPoly<S> {
+impl<S: OverField + for<'a> MulAssign<&'a u128>> Mul<&u128> for SplitRingPoly<S> {
     type Output = Self;
 
     fn mul(mut self, rhs: &u128) -> Self::Output {
@@ -661,6 +678,47 @@ mod tests {
         let mut expected = vec![0u128; 512];
         expected[3] = 5;
         expected[20] = 2711;
+
+        assert_eq!(rm, expected);
+    }
+
+    #[test]
+    fn test_splitring_poly_center() {
+        // 5X^3 + 8000*X^10 * 5X^10 = (5X^3 + 3133^20) mod p
+        // 5X^3 + 8000*X^10 * 5X^10 = (5X^3 + 40000^20) mod q
+        // 5X^3 + 8000*X^10 * 5X^10 + pv = (5X^3 + 3133^20) mod q
+        let mut s1 = vec![0u128; 512];
+        s1[3] = 5;
+        let mut s2 = vec![0u128; 512];
+        s2[10] = 8000;
+        let mut h = vec![0u128; 512];
+        h[10] = 5;
+        let mut c = vec![0u128; 512];
+        c[3] = 5;
+        c[20] = 40000;
+        let mut v = vec![0u128; 512];
+        v[20] = 1;
+
+        let s1: SplitRingPoly<Poly> = SplitRingPoly::from_r(&s1);
+        let mut s2: SplitRingPoly<Poly> = SplitRingPoly::from_r(&s2);
+        s2.center(FALCON_MOD);
+
+        let s2_rec = s2.recompose();
+        assert_eq!(
+            s2_rec[10],
+            u128::from(Fq::MODULUS.as_ref()[0]) - (FALCON_MOD - 8000)
+        );
+
+        let h: SplitRingPoly<Poly> = SplitRingPoly::from_r(&h);
+        let s1ps2h = s1 + s2 * h;
+        let v = s1ps2h.lift(FALCON_MOD);
+
+        let sm = s1ps2h - v * &FALCON_MOD;
+        let rm = sm.recompose();
+
+        let mut expected = vec![0u128; 512];
+        expected[3] = 5;
+        expected[20] = 3133;
 
         assert_eq!(rm, expected);
     }

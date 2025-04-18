@@ -2,7 +2,7 @@ mod builder;
 mod ops;
 
 pub use builder::{R1CSBuilder, ZBuildError, ZBuilder};
-pub use ops::{CSRing, Input};
+pub use ops::{CSRing, Input, UnitMonomial};
 
 use crate::{FALCON_MOD, FalconInput, FalconSig, SplitRingPoly};
 use ark_ff::Field;
@@ -51,11 +51,16 @@ pub fn signature_verification_r1cs<R: CSRing>(
     // norm bound
     let norm_bound =
         R::cs_norm_bound_xy(Input::private("s1p"), Input::private("s2p"), d, log_bound);
+    // coefficients used in norm bound are from s1, s2
+    let combine_s1 = R::cs_combine(Input::private("s1"), Input::private("s1p"), d, k);
+    let combine_s2 = R::cs_combine(Input::private("s2"), Input::private("s2p"), d, k);
 
     builder.push(s2h);
     builder.push(fin);
     builder.push(lift);
     builder.push(norm_bound);
+    builder.push(combine_s1);
+    builder.push(combine_s2);
 
     builder.build()
 }
@@ -67,14 +72,20 @@ pub fn signature_verification_splitring_z<R>(
     map: VariableMap,
 ) -> Result<Vec<R>, ZBuildError>
 where
-    R: SuitableRing,
+    R: SuitableRing + UnitMonomial,
     <<R as stark_rings::PolyRing>::BaseRing as Field>::BasePrimeField: ConvertibleRing,
 {
     let k = 32;
 
-    let s1_r = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s1).crt();
-    let s2_r = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s2).crt();
-    let h_r = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&x.h).crt();
+    let mut s1_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s1);
+    s1_srp.center(FALCON_MOD);
+    let s1_r = s1_srp.clone().crt();
+    let mut s2_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s2);
+    s2_srp.center(FALCON_MOD);
+    let s2_r = s2_srp.clone().crt();
+    let mut h_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&x.h);
+    h_srp.center(FALCON_MOD);
+    let h_r = h_srp.crt();
     let c_r = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&x.c).crt();
 
     let s2h = s2_r.clone() * h_r.clone();
@@ -89,6 +100,82 @@ where
             let mut x = R::CoefficientRepresentation::ZERO;
             x.coeffs_mut()[w] = 1u32.into();
             s2_r.splits()[i] * h_r.splits()[j] * x.crt()
+        })
+        .collect::<Vec<_>>();
+
+    let s1_p = s1_srp
+        .recompose()
+        .iter()
+        .map(|c| R::from(*c))
+        .collect::<Vec<_>>();
+    let s2_p = s2_srp
+        .recompose()
+        .iter()
+        .map(|c| R::from(*c))
+        .collect::<Vec<_>>();
+
+    let (s1_norm, s2_norm) = w.norms_squared();
+    let norm = s1_norm + s2_norm;
+
+    let mut remaining = norm;
+    let mut norm_decomp = vec![R::from(0u32); log_bound];
+    for (i, c) in norm_decomp.iter_mut().enumerate() {
+        *c = if (remaining & (1 << i)) != 0 {
+            remaining -= 1 << i;
+            R::from(1u32)
+        } else {
+            R::from(0u32)
+        };
+    }
+
+    ZBuilder::<R>::new(map)
+        .set("h", h_r.splits())?
+        .set("c", c_r.splits())?
+        .set("s1", s1_r.splits())?
+        .set("s2", s2_r.splits())?
+        .set("s2h", s2h.splits())?
+        .set("s2*h", &s2h_cross)?
+        .set("v", v_r.splits())?
+        .set("s1+s2h", s1ps2h.splits())?
+        .set("s1p", &s1_p)?
+        .set("s2p", &s2_p)?
+        .set("s1p*s1p", &s1_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+        .set("s2p*s2p", &s2_p.iter().map(|x| *x * *x).collect::<Vec<_>>())?
+        .set("||s1p||^2", &[R::from(s1_norm)])?
+        .set("||s2p||^2", &[R::from(s2_norm)])?
+        .set("||s1p,s2p||^2 decomp", &norm_decomp)?
+        .build()
+}
+
+pub fn signature_verification_splitringpoly_z<R>(
+    x: &FalconInput,
+    w: &FalconSig,
+    log_bound: usize,
+    map: VariableMap,
+) -> Result<Vec<R>, ZBuildError>
+where
+    R: SuitableRing + UnitMonomial,
+    <R as stark_rings::PolyRing>::BaseRing: ConvertibleRing,
+{
+    let k = 32;
+
+    let s1_r = SplitRingPoly::<R>::from_r(&w.s1);
+    let s2_r = SplitRingPoly::<R>::from_r(&w.s2);
+    let h_r = SplitRingPoly::<R>::from_r(&x.h);
+    let c_r = SplitRingPoly::<R>::from_r(&x.c);
+
+    let s2h = s2_r.clone() * h_r.clone();
+    let s1ps2h = s1_r.clone() + s2h.clone();
+    let v_r = s1ps2h.clone().lift(FALCON_MOD);
+
+    let s2h_cross = (0..k * k)
+        .map(|idx| {
+            let i = idx / k;
+            let j = idx % k;
+            let w = (i + j) / k;
+            let mut x = R::ZERO;
+            x.coeffs_mut()[w] = 1u32.into();
+            s2_r.splits()[i] * h_r.splits()[j] * x
         })
         .collect::<Vec<_>>();
 
