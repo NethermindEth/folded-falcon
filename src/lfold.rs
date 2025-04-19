@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ark_serialize::{CanonicalSerialize, Compress};
 use cyclotomic_rings::{
     challenge_set::LatticefoldChallengeSet as ChallengeSet, rings::SuitableRing,
 };
@@ -107,12 +108,6 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
 
         Ok(proof)
     }
-
-    /// Size of aggregated compnatures over size of separate compnatures
-    pub fn compression_ratio(&self) -> f32 {
-        // TODO self.serialize().len() / ( FalgonSig.serialize().len() * count )
-        1.0
-    }
 }
 
 impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usize>
@@ -162,6 +157,19 @@ fn linearize<R: SuitableRing, CS: ChallengeSet<R>, const C: usize>(
         &comp.ccs,
     )?
     .0)
+}
+
+pub fn compression_ratio<const C: usize, R: SuitableRing>(n: usize, proof: &LFProof<C, R>) -> f64 {
+    // TODO move, add 1024 deg support (1280 bytes)
+    let sig_len: usize = 666;
+    let salt_len: usize = 40;
+
+    let mut serialized = Vec::new();
+    proof
+        .serialize_with_mode(&mut serialized, Compress::Yes)
+        .unwrap();
+
+    (serialized.len() + n * salt_len) as f64 / (n * (sig_len - salt_len)) as f64
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1"
 ark-ff = "0.4.2"
+ark-serialize = "0.4.2"
 bit-vec = "0.6"
 cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
 falcon-rust = { git = "https://github.com/v0-e/falcon-rust", branch = "pub" }

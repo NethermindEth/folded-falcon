@@ -3,7 +3,7 @@ mod lfold;
 pub mod r1cs;
 mod subring;
 
-pub use lfold::{LFAcc, LFComp, LFVerifier};
+pub use lfold::{LFAcc, LFComp, LFVerifier, compression_ratio};
 pub use subring::{SplitRing, SplitRingPoly};
 
 pub const FALCON_MOD: u128 = 12289;
@@ -63,19 +63,19 @@ mod tests {
     const K: usize = 32;
     type SplitNTT = SplitRing<RqNTT, K>;
 
-    #[derive(Clone)]
-    pub struct DP {}
-    impl DecompositionParams for DP {
-        const B: u128 = 8388608;
-        const L: usize = 3;
-        const B_SMALL: usize = 2;
-        const K: usize = 23;
-    }
-
-    const C: usize = 157;
+    const C: usize = 38;
     const W: usize = WIT_LEN * DP::L;
     const WIT_LEN: usize = 3260;
     type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
+
+    #[derive(Clone)]
+    pub struct DP {}
+    impl DecompositionParams for DP {
+        const B: u128 = 131072;
+        const L: usize = 4;
+        const B_SMALL: usize = 2;
+        const K: usize = 17;
+    }
 
     fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
         let msg = b"Hello, world!";
