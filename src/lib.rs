@@ -85,8 +85,8 @@ mod tests {
         let k = 32;
         let log_bound = 26; // ceil(log2(34034726))
 
-        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(k, d, log_bound);
-        let z = signature_verification_splitring_z(&x, &w, log_bound, map)?;
+        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(1, k, d, log_bound);
+        let z = signature_verification_splitring_z(&[(x, w)], log_bound, map)?;
 
         let x_len = r1cs.l;
         //println!("WIT_LEN: {}", z.len() - x_len - 1);
