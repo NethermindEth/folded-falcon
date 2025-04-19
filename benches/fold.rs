@@ -17,6 +17,9 @@ use latticefold::{
 };
 use rand::Rng;
 
+const K: usize = 32;
+type SplitNTT = SplitRing<RqNTT, K>;
+
 const C: usize = 38;
 const W: usize = WIT_LEN * DP::L;
 const WIT_LEN: usize = 3260;
@@ -39,11 +42,10 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
     let (x, w) = deserialize(msg, &sig, &pk);
 
     let d = 512;
-    let k = 32;
     let log_bound = 26; // ceil(log2(34034726))
 
-    let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(1, k, d, log_bound);
-    let z = signature_verification_splitring_z(&[(x, w)], log_bound, map)?;
+    let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, d, log_bound);
+    let z = signature_verification_splitring_z::<_, K>(&[(x, w)], log_bound, map)?;
 
     let x_len = r1cs.l;
     //println!("WIT_LEN: {}", z.len() - x_len - 1);

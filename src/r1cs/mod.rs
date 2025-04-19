@@ -23,7 +23,6 @@ use stark_rings::{
 /// - `log_bound` is the log-2 of the norm bound of the signature components $(s1, s2)$.
 pub fn signature_verification_r1cs<R: CSRing>(
     n: usize,
-    k: usize,
     d: usize,
     log_bound: usize,
 ) -> (R1CS<R::Base>, VariableMap) {
@@ -35,21 +34,18 @@ pub fn signature_verification_r1cs<R: CSRing>(
             Input::private(format!("{i}s2")),
             Input::public(format!("{i}h")),
             Input::private(format!("{i}s2{i}h")),
-            k,
         );
         // s1 + s2h
         let fin = R::cs_add(
             Input::private(format!("{i}s1")),
             Input::private(format!("{i}s2{i}h")),
             Input::private(format!("{i}s1+{i}s2{i}h")),
-            k,
         );
         // s1 + s2h - pv = c
         let lift = R::cs_liftsub(
             Input::private(format!("{i}s1+{i}s2{i}h")),
             Input::private(format!("{i}v")),
             Input::public(format!("{i}c")),
-            k,
             FALCON_MOD,
         );
         // norm bound
@@ -64,13 +60,11 @@ pub fn signature_verification_r1cs<R: CSRing>(
             Input::private(format!("{i}s1")),
             Input::private(format!("{i}s1p")),
             d,
-            k,
         );
         let combine_s2 = R::cs_combine(
             Input::private(format!("{i}s2")),
             Input::private(format!("{i}s2p")),
             d,
-            k,
         );
 
         builder.push(s2h);
@@ -84,7 +78,7 @@ pub fn signature_verification_r1cs<R: CSRing>(
     builder.build()
 }
 
-pub fn signature_verification_splitring_z<R>(
+pub fn signature_verification_splitring_z<R, const K: usize>(
     xw: &[(FalconInput, FalconSig)],
     log_bound: usize,
     map: VariableMap,
@@ -93,31 +87,29 @@ where
     R: SuitableRing + UnitMonomial,
     <<R as stark_rings::PolyRing>::BaseRing as Field>::BasePrimeField: ConvertibleRing,
 {
-    let k = 32;
-
     let mut zbuild = ZBuilder::<R>::new(map);
 
     for (i, (x, w)) in xw.iter().enumerate() {
-        let mut s1_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s1);
+        let mut s1_srp = SplitRingPoly::<R::CoefficientRepresentation, K>::from_r(&w.s1);
         s1_srp.center(FALCON_MOD);
         let s1_r = s1_srp.clone().crt();
-        let mut s2_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&w.s2);
+        let mut s2_srp = SplitRingPoly::<R::CoefficientRepresentation, K>::from_r(&w.s2);
         s2_srp.center(FALCON_MOD);
         let s2_r = s2_srp.clone().crt();
-        let mut h_srp = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&x.h);
+        let mut h_srp = SplitRingPoly::<R::CoefficientRepresentation, K>::from_r(&x.h);
         h_srp.center(FALCON_MOD);
         let h_r = h_srp.crt();
-        let c_r = SplitRingPoly::<R::CoefficientRepresentation>::from_r(&x.c).crt();
+        let c_r = SplitRingPoly::<R::CoefficientRepresentation, K>::from_r(&x.c).crt();
 
         let s2h = s2_r.clone() * h_r.clone();
         let s1ps2h = s1_r.clone() + s2h.clone();
         let v_r = s1ps2h.clone().icrt().lift(FALCON_MOD).crt();
 
-        let s2h_cross = (0..k * k)
+        let s2h_cross = (0..K * K)
             .map(|idx| {
-                let i = idx / k;
-                let j = idx % k;
-                let w = (i + j) / k;
+                let i = idx / K;
+                let j = idx % K;
+                let w = (i + j) / K;
                 let mut x = R::CoefficientRepresentation::ZERO;
                 x.coeffs_mut()[w] = 1u32.into();
                 s2_r.splits()[i] * h_r.splits()[j] * x.crt()
@@ -211,6 +203,9 @@ mod tests {
     use falcon_rust::falcon512;
     use rand::{Rng, thread_rng};
 
+    const K: usize = 32;
+    type SplitNTT = SplitRing<RqNTT, K>;
+
     #[test]
     fn test_r1cs_signature_verification() {
         let r1cs = signature_verification_cs().to_r1cs();
@@ -229,9 +224,8 @@ mod tests {
     #[test]
     fn test_r1cs_splitring_signature_verification_dummy() {
         let d = 512;
-        let k = 32;
         let log_bound = 26; // ceil(log2(34034726))
-        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(1, k, d, log_bound);
+        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, d, log_bound);
 
         // 20X^40 + 3000X^10 * 5X^10 = 2711^20 + 20X^40
         let mut h = vec![0u128; 512];
@@ -247,7 +241,7 @@ mod tests {
         let x = FalconInput { h, c };
         let w = FalconSig { s1, s2 };
 
-        let z = signature_verification_splitring_z(&[(x, w)], log_bound, map).unwrap();
+        let z = signature_verification_splitring_z::<_, K>(&[(x, w)], log_bound, map).unwrap();
         r1cs.check_relation(&z).unwrap();
     }
 
@@ -260,11 +254,10 @@ mod tests {
         let (x, w) = deserialize(msg, &sig, &pk);
 
         let d = 512;
-        let k = 32;
         let log_bound = 26; // ceil(log2(34034726))
 
-        let (r1cs, map) = signature_verification_r1cs::<SplitRing<RqNTT>>(1, k, d, log_bound);
-        let z = signature_verification_splitring_z(&[(x, w)], log_bound, map).unwrap();
+        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, d, log_bound);
+        let z = signature_verification_splitring_z::<_, K>(&[(x, w)], log_bound, map).unwrap();
         r1cs.check_relation(&z).unwrap();
     }
 }

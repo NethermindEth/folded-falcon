@@ -249,13 +249,11 @@ mod tests {
             Input::public("a"),
             Input::public("b"),
             Input::private("c"),
-            0,
         ));
         builder.push(RqNTT::cs_mul(
             Input::public("u"),
             Input::public("v"),
             Input::private("w"),
-            0,
         ));
         let (r1cs, map) = builder.build();
 
@@ -282,13 +280,11 @@ mod tests {
             Input::public("a"),
             Input::public("b"),
             Input::private("c"),
-            0,
         ));
         builder.push(RqNTT::cs_mul(
             Input::public("a"),
             Input::public("v"),
             Input::private("w"),
-            0,
         ));
         let (r1cs, map) = builder.build();
 
@@ -312,13 +308,11 @@ mod tests {
             Input::public("a"),
             Input::public("b"),
             Input::private("f"),
-            0,
         ));
         builder.push(RqNTT::cs_mul(
             Input::private("f"),
             Input::public("v"),
             Input::private("w"),
-            0,
         ));
         let (r1cs, map) = builder.build();
 
@@ -342,13 +336,11 @@ mod tests {
             Input::private("a"),
             Input::public("b"),
             Input::private("f"),
-            0,
         ));
         builder.push(RqNTT::cs_mul(
             Input::private("f"),
             Input::public("v"),
             Input::private("w"),
-            0,
         ));
         let (r1cs, map) = builder.build();
 
