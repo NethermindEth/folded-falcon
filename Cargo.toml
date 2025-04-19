@@ -25,3 +25,7 @@ criterion = "0.5.1"
 [[bench]]
 name = "fold"
 harness = false
+
+[[bench]]
+name = "fold2"
+harness = false
