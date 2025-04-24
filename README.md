@@ -27,3 +27,9 @@ where, $v = -(s_1  \cdot h + s_2 - c) / p \bmod q$ and $v$ must also be small
 ### Used ring
 
 ## References
+
+## License
+
+Apache 2.0
+
+(the license is also applied to the commits done before the license was committed)
