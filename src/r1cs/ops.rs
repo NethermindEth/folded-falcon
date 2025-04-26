@@ -724,7 +724,7 @@ mod tests {
             Input::public("a"),
             Input::private("b"),
             Input::private("c"),
-            FALCON_MOD,
+            FALCON_MOD.into(),
         )
         .to_r1cs();
         // 15000 - pv = 2711
@@ -1204,7 +1204,7 @@ mod tests {
             Input::private("a"),
             Input::public("b"),
             Input::public("c"),
-            FALCON_MOD,
+            FALCON_MOD.into(),
         )
         .to_r1cs();
 

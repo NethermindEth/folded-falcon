@@ -1,6 +1,7 @@
+use crate::falcon::FalconPoly;
 use cyclotomic_rings::rings::SuitableRing;
 use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::ToPrimitive;
 use stark_rings::{
     OverField, PolyRing, Ring, balanced_decomposition::convertible_ring::ConvertibleRing,
     cyclotomic_ring::CRT,
@@ -29,10 +30,7 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
     ///
     /// Assumes mod of S >> mod of R (if R has modulus)
     /// Assumes mod of R < 2^128
-    pub fn from_r(r_coeffs: &[u128]) -> Self
-    where
-        S::BaseRing: ConvertibleRing,
-    {
+    pub fn from_r(r_coeffs: &[impl Into<u128> + Copy]) -> Self {
         let dk = r_coeffs.len(); // R degree
         let d = S::dimension(); // S degree
         assert!(d <= dk);
@@ -41,17 +39,19 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
         let mut s = [S::from(0u128); K];
 
         for (g, coeff) in r_coeffs.iter().enumerate() {
-            if coeff.is_zero() {
-                continue;
-            }
+            let c: u128 = (*coeff).into();
 
             let i = g % K;
             let j = g / K;
 
-            s[i].coeffs_mut()[j] = S::BaseRing::from(r_coeffs[g].to_u128().unwrap());
+            s[i].coeffs_mut()[j] = S::BaseRing::from(c);
         }
 
         Self(s)
+    }
+
+    pub fn from_fpoly<const N: usize>(p: &FalconPoly<N>) -> Self {
+        Self::from_r(p.coeffs())
     }
 
     /// Maps back subrings S to a ring R
@@ -85,10 +85,11 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
     }
 
     /// Calculates a lifting polynomial `v`, where `self mod p` is lifted to `self + v*p mod q`
-    pub fn lift(&self, p: u128) -> Self
+    pub fn lift(&self, p: impl Into<u128>) -> Self
     where
         S::BaseRing: ConvertibleRing,
     {
+        let p: u128 = p.into();
         let mid = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(u128::from(<<S::BaseRing as ark_ff::Field>::BasePrimeField as ark_ff::PrimeField>::MODULUS_MINUS_ONE_DIV_TWO.as_ref()[0]));
         let q = u128::from(
             <<S::BaseRing as ark_ff::Field>::BasePrimeField as ark_ff::PrimeField>::MODULUS
@@ -119,10 +120,11 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
     }
 
     /// Centers self coefficients to [-p/2, p/2] around the self's modulus
-    pub fn center(&mut self, p: u128)
+    pub fn center(&mut self, p: impl Into<u128>)
     where
         S::BaseRing: ConvertibleRing,
     {
+        let p: u128 = p.into();
         let half_p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p / 2);
         let p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p);
         self.0.iter_mut().for_each(|split| {
@@ -245,6 +247,23 @@ impl<S: OverField + for<'a> MulAssign<&'a u128>, const K: usize> Mul<&u128>
     }
 }
 
+impl<S: OverField + for<'a> MulAssign<&'a u16>, const K: usize> MulAssign<&u16>
+    for SplitRingPoly<S, K>
+{
+    fn mul_assign(&mut self, rhs: &u16) {
+        self.0.iter_mut().for_each(|s_i| *s_i *= rhs);
+    }
+}
+
+impl<S: OverField + for<'a> MulAssign<&'a u16>, const K: usize> Mul<&u16> for SplitRingPoly<S, K> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &u16) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
 impl<U: SuitableRing, const K: usize> Mul for SplitRing<U, K> {
     type Output = Self;
 
@@ -290,6 +309,21 @@ impl<U: SuitableRing, const K: usize> Mul<&u128> for SplitRing<U, K> {
     type Output = Self;
 
     fn mul(mut self, rhs: &u128) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl<U: SuitableRing, const K: usize> MulAssign<&u16> for SplitRing<U, K> {
+    fn mul_assign(&mut self, rhs: &u16) {
+        self.0.iter_mut().for_each(|s_i| *s_i *= &(*rhs as u128));
+    }
+}
+
+impl<U: SuitableRing, const K: usize> Mul<&u16> for SplitRing<U, K> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &u16) -> Self::Output {
         self *= rhs;
         self
     }
@@ -710,7 +744,7 @@ mod tests {
         let s2_rec = s2.recompose();
         assert_eq!(
             s2_rec[10],
-            u128::from(Fq::MODULUS.as_ref()[0]) - (FALCON_MOD - 8000)
+            u128::from(Fq::MODULUS.as_ref()[0]) - u128::from(FALCON_MOD - 8000)
         );
 
         let h = SplitPoly::from_r(&h);
