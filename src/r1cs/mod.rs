@@ -200,14 +200,15 @@ mod tests {
     use super::*;
     use crate::{
         SplitRing,
-        falcon::{Falcon512, FalconOps, FalconParams, FalconPoly},
+        falcon::{Falcon512, Falcon1024, FalconOps, FalconParams, FalconPoly},
     };
     use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
     use rand::{Rng, thread_rng};
 
-    type Falcon = Falcon512;
     const K: usize = 32;
+    const K2: usize = 64;
     type SplitNTT = SplitRing<RqNTT, K>;
+    type SplitNTT2 = SplitRing<RqNTT, K2>;
 
     #[test]
     fn test_r1cs_signature_verification() {
@@ -226,10 +227,10 @@ mod tests {
 
     #[test]
     fn test_r1cs_splitring_signature_verification_dummy() {
-        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
+        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon512::N, Falcon512::LSB2);
 
         // 20X^40 + 3000X^10 * 5X^10 = 2711^20 + 20X^40
-        let mut h = FalconPoly::<{ Falcon::N }>::new();
+        let mut h = FalconPoly::<{ Falcon512::N }>::new();
         h.coeffs_mut()[10] = 5;
         let mut s2 = FalconPoly::new();
         s2.coeffs_mut()[10] = 3000;
@@ -242,24 +243,49 @@ mod tests {
         let x = FalconInput { h, c };
         let w = FalconSig { s1, s2 };
 
-        let z =
-            signature_verification_splitring_z::<_, K, { Falcon::N }>(&[(x, w)], Falcon::LSB2, map)
-                .unwrap();
+        let z = signature_verification_splitring_z::<_, K, { Falcon512::N }>(
+            &[(x, w)],
+            Falcon512::LSB2,
+            map,
+        )
+        .unwrap();
         r1cs.check_relation(&z).unwrap();
     }
 
     #[test]
-    fn test_r1cs_splitring_signature_verification_falcon() {
+    fn test_r1cs_splitring_signature_verification_falcon512() {
         let msg = b"Hello, world!";
-        let (sk, pk) = Falcon::keygen(thread_rng().r#gen());
-        let sig = Falcon::sign(msg, &sk);
+        let (sk, pk) = Falcon512::keygen(thread_rng().r#gen());
+        let sig = Falcon512::sign(msg, &sk);
 
-        let (x, w) = Falcon::deserialize(msg, &sig, &pk);
+        let (x, w) = Falcon512::deserialize(msg, &sig, &pk);
 
-        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
-        let z =
-            signature_verification_splitring_z::<_, K, { Falcon::N }>(&[(x, w)], Falcon::LSB2, map)
-                .unwrap();
+        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon512::N, Falcon512::LSB2);
+        let z = signature_verification_splitring_z::<_, K, { Falcon512::N }>(
+            &[(x, w)],
+            Falcon512::LSB2,
+            map,
+        )
+        .unwrap();
+        r1cs.check_relation(&z).unwrap();
+    }
+
+    #[test]
+    fn test_r1cs_splitring_signature_verification_falcon1024() {
+        let msg = b"Hello, world!";
+        let (sk, pk) = Falcon1024::keygen(thread_rng().r#gen());
+        let sig = Falcon1024::sign(msg, &sk);
+
+        let (x, w) = Falcon1024::deserialize(msg, &sig, &pk);
+
+        let (r1cs, map) =
+            signature_verification_r1cs::<SplitNTT2>(1, Falcon1024::N, Falcon1024::LSB2);
+        let z = signature_verification_splitring_z::<_, K2, { Falcon1024::N }>(
+            &[(x, w)],
+            Falcon1024::LSB2,
+            map,
+        )
+        .unwrap();
         r1cs.check_relation(&z).unwrap();
     }
 }
