@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use folded_falcon::{
     LFAcc, LFComp, LFVerifier, SplitRing,
-    falcon::{Falcon512, FalconOps, FalconParams, deserialize},
+    falcon::{Falcon512, FalconOps, FalconParams},
     r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
 };
 
@@ -38,12 +38,12 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
     let msg = b"Hello, world!";
     let (sk, pk) = Falcon::keygen(rand::thread_rng().r#gen());
     let sig = Falcon::sign(msg, &sk);
-    let (x0, w0) = deserialize(msg, &sig, &pk);
+    let (x0, w0) = Falcon::deserialize(msg, &sig, &pk);
 
     let msg = b"Bye, world!";
     let (sk, pk) = Falcon::keygen(rand::thread_rng().r#gen());
     let sig = Falcon::sign(msg, &sk);
-    let (x1, w1) = deserialize(msg, &sig, &pk);
+    let (x1, w1) = Falcon::deserialize(msg, &sig, &pk);
 
     let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(2, Falcon::N, Falcon::LSB2);
     let z = signature_verification_splitring_z::<_, K, { Falcon::N }>(

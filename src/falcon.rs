@@ -35,6 +35,11 @@ pub trait FalconOps: FalconParams {
     fn keygen(seed: [u8; 32]) -> (Self::SecretKey, Self::PublicKey);
     fn sign(m: &[u8], sk: &Self::SecretKey) -> Self::Signature;
     fn verify(m: &[u8], sig: &Self::Signature, pk: &Self::PublicKey) -> bool;
+    fn deserialize(
+        m: &[u8],
+        sig: &Self::Signature,
+        pk: &Self::PublicKey,
+    ) -> (Self::Input, Self::Witness);
 }
 
 macro_rules! impl_falcon_ops {
@@ -48,6 +53,13 @@ macro_rules! impl_falcon_ops {
             }
             fn verify(m: &[u8], sig: &Signature<$n>, pk: &PublicKey<$n>) -> bool {
                 paste::paste! { [<falcon $n>]::verify(m, sig, pk) }
+            }
+            fn deserialize(
+                m: &[u8],
+                sig: &Signature<$n>,
+                pk: &PublicKey<$n>,
+            ) -> (FalconInput<$n>, FalconSig<$n>) {
+                deserialize(m, sig, pk)
             }
         }
     };
@@ -95,7 +107,7 @@ impl FalconParams for Falcon1024 {
     type Witness = FalconSig<{ Self::N }>;
 }
 
-pub fn deserialize<const N: usize>(
+fn deserialize<const N: usize>(
     m: &[u8],
     sig: &Signature<N>,
     pk: &PublicKey<N>,
