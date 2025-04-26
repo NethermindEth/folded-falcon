@@ -200,7 +200,7 @@ mod tests {
     use super::*;
     use crate::{
         SplitRing,
-        falcon::{Falcon512, FalconOps, FalconParams, FalconPoly, deserialize},
+        falcon::{Falcon512, FalconOps, FalconParams, FalconPoly},
     };
     use cyclotomic_rings::rings::FrogRingNTT as RqNTT;
     use rand::{Rng, thread_rng};
@@ -254,7 +254,7 @@ mod tests {
         let (sk, pk) = Falcon::keygen(thread_rng().r#gen());
         let sig = Falcon::sign(msg, &sk);
 
-        let (x, w) = deserialize(msg, &sig, &pk);
+        let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
         let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
         let z =

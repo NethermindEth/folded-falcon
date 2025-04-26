@@ -37,7 +37,7 @@ mod tests {
     use super::*;
     use crate::{
         SplitRing,
-        falcon::{Falcon512, FalconOps, FalconParams, deserialize},
+        falcon::{Falcon512, FalconOps, FalconParams},
         r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
     };
     use anyhow::Result;
@@ -73,7 +73,7 @@ mod tests {
         let (sk, pk) = Falcon::keygen(rand::thread_rng().r#gen());
         let sig = Falcon::sign(msg, &sk);
 
-        let (x, w) = deserialize(msg, &sig, &pk);
+        let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
         let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
         let z = signature_verification_splitring_z::<_, K, { Falcon::N }>(
