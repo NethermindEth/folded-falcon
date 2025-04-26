@@ -26,6 +26,13 @@ pub struct LFComp<R: SuitableRing, const C: usize> {
     pub witness: Witness<R>,
 }
 
+/// Single non-accumulated LatticeFold instance, without the witness
+#[derive(Clone, Debug)]
+pub struct LFCompVerifier<R: SuitableRing, const C: usize> {
+    pub ccs: CCS<R>,
+    pub cccs: CCCS<C, R>,
+}
+
 /// Accumulated LatticeFold instance
 #[derive(Clone)]
 pub struct LFAcc<
@@ -132,7 +139,7 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
         })
     }
 
-    pub fn verify(&mut self, comp: &LFComp<R, C>, proof: &LFProof<C, R>) -> Result<()> {
+    pub fn verify(&mut self, comp: &LFCompVerifier<R, C>, proof: &LFProof<C, R>) -> Result<()> {
         self.lcccs = NIFSVerifier::<C, R, DP, TS<R, CS>>::verify(
             &self.lcccs,
             &comp.cccs,
@@ -143,6 +150,15 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
         self.count += 1;
 
         Ok(())
+    }
+}
+
+impl<R: SuitableRing, const C: usize> From<LFComp<R, C>> for LFCompVerifier<R, C> {
+    fn from(comp: LFComp<R, C>) -> Self {
+        LFCompVerifier {
+            ccs: comp.ccs,
+            cccs: comp.cccs,
+        }
     }
 }
 
@@ -258,7 +274,7 @@ mod tests {
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai());
             let proof = agg.fold(&comp)?;
-            ctx.verify(&comp, &proof)?;
+            ctx.verify(&comp.into(), &proof)?;
         }
 
         Ok(())

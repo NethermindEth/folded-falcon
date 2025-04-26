@@ -92,8 +92,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut ctx = LFVerifier::<RqNTT, DP, CS, C>::init(&comp0, &proof).unwrap();
     c.bench_function("verify2", |b| {
         b.iter_batched(
-            || agg0.fold(&comp).unwrap(),
-            |proof| ctx.verify(&comp, &proof).unwrap(),
+            || (agg0.fold(&comp).unwrap(), comp.clone().into()),
+            |(proof, compv)| ctx.verify(&compv, &proof).unwrap(),
             criterion::BatchSize::SmallInput,
         )
     });
