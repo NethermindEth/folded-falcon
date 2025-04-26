@@ -113,7 +113,7 @@ mod tests {
         for _ in 0..3 {
             let comp = dummy_comp(agg.ajtai())?;
             let proof = agg.fold(&comp)?;
-            ctx.verify(&comp, &proof)?;
+            ctx.verify(&comp.into(), &proof)?;
         }
 
         Ok(())
