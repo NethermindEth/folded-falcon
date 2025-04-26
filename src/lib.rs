@@ -3,42 +3,32 @@ mod lfold;
 pub mod r1cs;
 mod subring;
 
+pub use falcon::FALCON_MOD;
 pub use lfold::{LFAcc, LFComp, LFVerifier, compression_ratio};
 pub use subring::{SplitRing, SplitRingPoly};
 
-pub const FALCON_MOD: u128 = 12289;
+use falcon::FalconPoly;
 
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
-pub struct FalconSig {
-    pub s1: Vec<u128>,
-    pub s2: Vec<u128>,
+pub struct FalconSig<const N: usize> {
+    pub s1: FalconPoly<N>,
+    pub s2: FalconPoly<N>,
 }
 
 /// Statement (public input)
 #[derive(Clone, Debug)]
-pub struct FalconInput {
+pub struct FalconInput<const N: usize> {
     /// Public key
-    pub h: Vec<u128>,
+    pub h: FalconPoly<N>,
     /// Hash(r,m)
-    pub c: Vec<u128>,
+    pub c: FalconPoly<N>,
 }
 
-impl FalconSig {
+impl<const N: usize> FalconSig<N> {
     /// Calculate the l2-norms (squared) of the signature components.
-    pub fn norms_squared(&self) -> (u128, u128) {
-        let balance = |c: &u128| -> u128 {
-            if *c > FALCON_MOD / 2 {
-                FALCON_MOD - c
-            } else {
-                *c
-            }
-        };
-
-        let s1_norm = self.s1.iter().map(balance).map(|c| c * c).sum::<u128>();
-        let s2_norm = self.s2.iter().map(balance).map(|c| c * c).sum::<u128>();
-
-        (s1_norm, s2_norm)
+    pub fn norms_squared(&self) -> (u64, u64) {
+        (self.s1.norm_squared(), self.s2.norm_squared())
     }
 }
 
@@ -47,18 +37,19 @@ mod tests {
     use super::*;
     use crate::{
         SplitRing,
-        falcon::deserialize,
+        falcon::{Falcon512, FalconOps, FalconParams, deserialize},
         r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
     };
     use anyhow::Result;
     use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
-    use falcon_rust::falcon512;
     use latticefold::{
         arith::{Arith, CCCS, CCS, Witness},
         commitment::AjtaiCommitmentScheme,
         decomposition_parameters::DecompositionParams,
     };
     use rand::Rng;
+
+    type Falcon = Falcon512;
 
     const K: usize = 32;
     type SplitNTT = SplitRing<RqNTT, K>;
@@ -79,16 +70,17 @@ mod tests {
 
     fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
         let msg = b"Hello, world!";
-        let (sk, pk) = falcon512::keygen(rand::thread_rng().r#gen());
-        let sig = falcon512::sign(msg, &sk);
+        let (sk, pk) = Falcon::keygen(rand::thread_rng().r#gen());
+        let sig = Falcon::sign(msg, &sk);
 
         let (x, w) = deserialize(msg, &sig, &pk);
 
-        let d = 512;
-        let log_bound = 26; // ceil(log2(34034726))
-
-        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, d, log_bound);
-        let z = signature_verification_splitring_z::<_, K>(&[(x, w)], log_bound, map)?;
+        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
+        let z = signature_verification_splitring_z::<_, K, { Falcon::N }>(
+            &[(x, w)],
+            Falcon::LSB2,
+            map,
+        )?;
 
         let x_len = r1cs.l;
         //println!("WIT_LEN: {}", z.len() - x_len - 1);

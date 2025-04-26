@@ -513,6 +513,7 @@ dependencies = [
  "num",
  "num-bigint",
  "num-traits",
+ "paste",
  "rand",
  "stark-rings",
  "stark-rings-linalg",

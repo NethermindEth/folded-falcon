@@ -15,6 +15,7 @@ latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "
 num = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
+paste = "1"
 rand = "0.8"
 stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
 stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }

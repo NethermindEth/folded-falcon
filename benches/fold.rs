@@ -3,13 +3,12 @@ use std::time::Duration;
 
 use folded_falcon::{
     LFAcc, LFComp, LFVerifier, SplitRing,
-    falcon::deserialize,
+    falcon::{Falcon512, FalconOps, FalconParams, deserialize},
     r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
 };
 
 use anyhow::Result;
 use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
-use falcon_rust::falcon512;
 use latticefold::{
     arith::{Arith, CCCS, CCS, Witness},
     commitment::AjtaiCommitmentScheme,
@@ -17,6 +16,7 @@ use latticefold::{
 };
 use rand::Rng;
 
+type Falcon = Falcon512;
 const K: usize = 32;
 type SplitNTT = SplitRing<RqNTT, K>;
 
@@ -36,16 +36,14 @@ impl DecompositionParams for DP {
 
 fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
     let msg = b"Hello, world!";
-    let (sk, pk) = falcon512::keygen(rand::thread_rng().r#gen());
-    let sig = falcon512::sign(msg, &sk);
+    let (sk, pk) = Falcon::keygen(rand::thread_rng().r#gen());
+    let sig = Falcon::sign(msg, &sk);
 
     let (x, w) = deserialize(msg, &sig, &pk);
 
-    let d = 512;
-    let log_bound = 26; // ceil(log2(34034726))
-
-    let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, d, log_bound);
-    let z = signature_verification_splitring_z::<_, K>(&[(x, w)], log_bound, map)?;
+    let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
+    let z =
+        signature_verification_splitring_z::<_, K, { Falcon::N }>(&[(x, w)], Falcon::LSB2, map)?;
 
     let x_len = r1cs.l;
     //println!("WIT_LEN: {}", z.len() - x_len - 1);
