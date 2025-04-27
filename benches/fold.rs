@@ -2,9 +2,8 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use std::time::Duration;
 
 use folded_falcon::{
-    LFAcc, LFComp, LFVerifier, SplitRing,
+    ConstraintScheme, LFAcc, LFComp, LFVerifier, SplitRing,
     falcon::{Falcon512, FalconOps, FalconParams},
-    r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
 };
 
 use anyhow::Result;
@@ -41,9 +40,8 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
 
     let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
-    let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
-    let z =
-        signature_verification_splitring_z::<_, K, { Falcon::N }>(&[(x, w)], Falcon::LSB2, map)?;
+    let (r1cs, map) = SplitNTT::r1cs(1, Falcon::N, Falcon::LSB2);
+    let z = SplitNTT::z(&[(x, w)], map, Falcon::LSB2).unwrap();
 
     let x_len = r1cs.l;
     //println!("WIT_LEN: {}", z.len() - x_len - 1);

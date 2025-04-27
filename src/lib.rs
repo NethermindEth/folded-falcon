@@ -5,6 +5,7 @@ mod subring;
 
 pub use falcon::FALCON_MOD;
 pub use lfold::{LFAcc, LFComp, LFVerifier, compression_ratio};
+pub use r1cs::ConstraintScheme;
 pub use subring::{SplitRing, SplitRingPoly};
 
 use falcon::FalconPoly;
@@ -38,7 +39,7 @@ mod tests {
     use crate::{
         SplitRing,
         falcon::{Falcon512, FalconOps, FalconParams},
-        r1cs::{signature_verification_r1cs, signature_verification_splitring_z},
+        r1cs::ConstraintScheme,
     };
     use anyhow::Result;
     use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
@@ -75,12 +76,8 @@ mod tests {
 
         let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
-        let (r1cs, map) = signature_verification_r1cs::<SplitNTT>(1, Falcon::N, Falcon::LSB2);
-        let z = signature_verification_splitring_z::<_, K, { Falcon::N }>(
-            &[(x, w)],
-            Falcon::LSB2,
-            map,
-        )?;
+        let (r1cs, map) = SplitNTT::r1cs(1, Falcon::N, Falcon::LSB2);
+        let z = SplitNTT::z(&[(x, w)], map, Falcon::LSB2).unwrap();
 
         let x_len = r1cs.l;
         //println!("WIT_LEN: {}", z.len() - x_len - 1);
