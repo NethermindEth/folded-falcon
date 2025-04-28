@@ -2,8 +2,9 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use std::time::Duration;
 
 use folded_falcon::{
-    ConstraintScheme, LFAcc, LFComp, LFVerifier, SplitRing,
-    falcon::{Falcon512, FalconOps, FalconParams},
+    LFAcc, LFComp, LFVerifier,
+    config::{F512Frog16 as FR, FoldedRing},
+    falcon::FalconOps,
 };
 
 use anyhow::Result;
@@ -15,9 +16,7 @@ use latticefold::{
 };
 use rand::Rng;
 
-type Falcon = Falcon512;
-const K: usize = 32;
-type SplitNTT = SplitRing<RqNTT, K>;
+type Falcon = <FR as FoldedRing>::Variant;
 
 const C: usize = 38;
 const W: usize = WIT_LEN * DP::L;
@@ -40,8 +39,8 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
 
     let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
-    let (r1cs, map) = SplitNTT::r1cs(1, Falcon::N, Falcon::LSB2);
-    let z = SplitNTT::z(&[(x, w)], map, Falcon::LSB2).unwrap();
+    let (r1cs, map) = FR::r1cs(1);
+    let z = FR::z(&[(x, w)], map).unwrap();
 
     let x_len = r1cs.l;
     //println!("WIT_LEN: {}", z.len() - x_len - 1);
