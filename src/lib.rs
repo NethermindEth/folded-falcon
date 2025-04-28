@@ -1,8 +1,10 @@
+pub mod config;
 pub mod falcon;
 mod lfold;
 pub mod r1cs;
 mod subring;
 
+pub use config::FoldedRing;
 pub use falcon::FALCON_MOD;
 pub use lfold::{LFAcc, LFComp, LFVerifier, compression_ratio};
 pub use r1cs::ConstraintScheme;
@@ -36,11 +38,7 @@ impl<const N: usize> FalconSig<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        SplitRing,
-        falcon::{Falcon512, FalconOps, FalconParams},
-        r1cs::ConstraintScheme,
-    };
+    use crate::{config::F512Frog16 as FR, falcon::FalconOps};
     use anyhow::Result;
     use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
     use latticefold::{
@@ -50,10 +48,7 @@ mod tests {
     };
     use rand::Rng;
 
-    type Falcon = Falcon512;
-
-    const K: usize = 32;
-    type SplitNTT = SplitRing<RqNTT, K>;
+    type Falcon = <FR as FoldedRing>::Variant;
 
     const C: usize = 38;
     const W: usize = WIT_LEN * DP::L;
@@ -76,8 +71,8 @@ mod tests {
 
         let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
-        let (r1cs, map) = SplitNTT::r1cs(1, Falcon::N, Falcon::LSB2);
-        let z = SplitNTT::z(&[(x, w)], map, Falcon::LSB2).unwrap();
+        let (r1cs, map) = FR::r1cs(1);
+        let z = FR::z(&[(x, w)], map).unwrap();
 
         let x_len = r1cs.l;
         //println!("WIT_LEN: {}", z.len() - x_len - 1);
