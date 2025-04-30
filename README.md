@@ -44,7 +44,7 @@ The above relation (lifted) is proven, with the l2-norm bound check being approx
 
 Out of the [available configured `stark-rings`](https://github.com/NethermindEth/stark-rings/tree/main/ring/src/cyclotomic_ring/models), only the Frog ring (degree $d\prime = 16$, modulus $q \approx 2^{64}$) is currently supported.
 
-For this, the split-ring homomorphism is employed, where a Falcon polynomial of degree $d$ is mapped into $k = d\prime/d$ smaller polynomials. Each of these smaller polynomials is a Frog polynomial ring.
+For this, the split-ring homomorphism is employed, where a Falcon polynomial of degree $d$ is mapped into $k = d/d\prime$ smaller polynomials. Each of these smaller polynomials is a Frog polynomial ring.
 
 For the Frog ring, employed in a folding-1-signature constraint system (R1CS) we have 2237 constraints and 3325 inputs. Out of these inputs, 3260 are witness values.
 
