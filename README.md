@@ -19,7 +19,7 @@ Falcon operates over a cyclotomic ring of degree $d = \\{ 512, 1024 \\}$ with mo
 
 **Witness**: Signature $(s_1, s_2)$. Given that we cannot prove $r$'s validity, we must move it to the statement.
 
-**Statement**: $c = Hash(r, msg)$
+**Statement**: $h$, $c = Hash(r, msg)$
 
 **Relation**: $s_1  \cdot h + s_2 - c \equiv 0  \pmod{p}$,and $(s_1, s_2)$ are small
 
