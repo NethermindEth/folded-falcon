@@ -35,6 +35,7 @@ impl<const N: usize> FalconSig<N> {
     }
 }
 
+#[cfg(feature = "slow-tests")]
 #[cfg(test)]
 mod tests {
     use super::*;

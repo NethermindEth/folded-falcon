@@ -1,33 +1,30 @@
-[package]
-name = "folded-falcon"
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/NethermindEth/folded-falcon"
+license = "Apache-2.0"
 
-[dependencies]
-anyhow = "1"
-ark-ff = "0.4.2"
-ark-serialize = "0.4.2"
-bit-vec = "0.6"
-cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
-falcon-rust = { git = "https://github.com/v0-e/falcon-rust", branch = "pub" }
-itertools = "0.12"
-latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
-num = "0.4"
-num-bigint = "0.4"
-num-traits = "0.2"
-paste = "1"
-rand = "0.8"
-stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
-stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
-thiserror = "2"
+[workspace]
+members = [
+    "crates/folded-falcon",
+]
+resolver = "2"
 
-[dev-dependencies]
-criterion = "0.5.1"
+[workspace.dependencies]
 
-[[bench]]
-name = "fold"
-harness = false
+[workspace.lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
 
-[[bench]]
-name = "fold2"
-harness = false
+[workspace.lints.clippy]
+arithmetic_side_effects = "deny"
+cast_lossless = "deny"
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+needless_return = "deny"
+panicking_overflow_checks = "deny"
+unwrap_used = "deny"
+
+
