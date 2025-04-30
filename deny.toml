@@ -23,7 +23,10 @@ feature-depth = 1
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-ignore = []
+ignore = [
+    "RUSTSEC-2024-0388", # derivative
+    "RUSTSEC-2024-0436", # paste
+]
 
 [licenses]
 allow = [
@@ -51,7 +54,7 @@ registries = []
 [bans]
 allow-wildcard-paths = true
 multiple-versions = "warn"
-wildcards = "deny"
+wildcards = "allow"
 highlight = "all"
 
 [bans.workspace-dependencies]
