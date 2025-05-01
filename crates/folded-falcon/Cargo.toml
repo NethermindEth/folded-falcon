@@ -1,0 +1,42 @@
+[package]
+name = "folded-falcon"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1"
+ark-ff = "0.4.2"
+ark-serialize = "0.4.2"
+bit-vec = "0.6"
+cyclotomic-rings = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
+falcon-rust = { git = "https://github.com/v0-e/falcon-rust", branch = "pub" }
+itertools = "0.12"
+latticefold = { git = "https://github.com/nethermindeth/latticefold", branch = "ev/r1cs-builder" }
+num = "0.4"
+num-bigint = "0.4"
+num-traits = "0.2"
+paste = "1"
+rand = "0.8"
+stark-rings = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
+stark-rings-linalg = { git = "https://github.com/NethermindEth/stark-rings.git", branch = "main", default-features = false }
+thiserror = "2"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "fold"
+harness = false
+
+[[bench]]
+name = "fold2"
+harness = false
+
+[features]
+default = []
+slow-tests = []
+
+[lints]
+workspace = true

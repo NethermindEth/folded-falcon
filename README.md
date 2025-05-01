@@ -2,7 +2,7 @@
 
 ## Falcon signature scheme overview
 Falcon operates over a cyclotomic ring of degree $d = \\{ 512, 1024 \\}$ with modulus $p = 12289$.
- 
+
 ### Signing (secret key, msg)
 1. Sample random salt: $r \leftarrow \\{0, 1\\}^k$
 2. Compute: $c = H(r, msg)$
@@ -47,6 +47,19 @@ Out of the [available configured `stark-rings`](https://github.com/NethermindEth
 For this, the split-ring homomorphism is employed, where a Falcon polynomial of degree $d$ is mapped into $k = d/d\prime$ smaller polynomials. Each of these smaller polynomials is a Frog polynomial ring.
 
 For the Frog ring, employed in a folding-1-signature constraint system (R1CS) we have 2237 constraints and 3325 inputs. Out of these inputs, 3260 are witness values.
+
+## Development
+
+This repository includes pre-commit/pre-push Git hooks managed in the `.githooks/` directory.
+These hooks help ensure code quality and consistency (e.g., formatting, linting).
+
+To enable these hooks, run the following command in your terminal:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This command needs to be run only once per repository clone.
 
 ## Performance
 
