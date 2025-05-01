@@ -146,6 +146,10 @@ impl<const N: usize> FalconPoly<N> {
         Self([0u16; N])
     }
 
+    pub fn from_coeffs(coeffs: [u16; N]) -> Self {
+        Self(coeffs)
+    }
+
     pub fn coeffs(&self) -> &[u16] {
         &self.0
     }
@@ -181,6 +185,12 @@ impl<const N: usize> FalconPoly<N> {
 impl<const N: usize> From<&Polynomial<Felt>> for FalconPoly<N> {
     fn from(p: &Polynomial<Felt>) -> Self {
         Self(core::array::from_fn(|i| p.coefficients[i].value() as u16))
+    }
+}
+
+impl<const N: usize> From<[u16; N]> for FalconPoly<N> {
+    fn from(coeffs: [u16; N]) -> Self {
+        Self::from_coeffs(coeffs)
     }
 }
 

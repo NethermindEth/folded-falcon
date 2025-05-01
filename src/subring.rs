@@ -96,7 +96,7 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
                 .as_ref()[0],
         );
         let p = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(p);
-        let q = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(q);
+        let qm1 = <S::BaseRing as ConvertibleRing>::UnsignedInt::from(q) - 1.into();
         let v: Vec<S> = self
             .splits()
             .iter()
@@ -107,7 +107,7 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
                     .map(|c| {
                         let c_int = Into::<<S::BaseRing as ConvertibleRing>::UnsignedInt>::into(*c);
                         if c_int > mid {
-                            -S::BaseRing::from((q.clone() - c_int) / p.clone() + 1.into())
+                            -S::BaseRing::from((qm1.clone() - c_int) / p.clone() + 1.into())
                         } else {
                             S::BaseRing::from(c_int / p.clone())
                         }
