@@ -321,7 +321,9 @@ impl<U: SuitableRing, const K: usize> Mul<&u128> for SplitRing<U, K> {
 
 impl<U: SuitableRing, const K: usize> MulAssign<&u16> for SplitRing<U, K> {
     fn mul_assign(&mut self, rhs: &u16) {
-        self.0.iter_mut().for_each(|s_i| *s_i *= &(*rhs as u128));
+        self.0
+            .iter_mut()
+            .for_each(|s_i| *s_i *= &(u128::from(*rhs)));
     }
 }
 

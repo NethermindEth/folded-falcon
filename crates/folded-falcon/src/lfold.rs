@@ -191,6 +191,7 @@ fn linearize<R: SuitableRing, CS: ChallengeSet<R>, const C: usize>(
 /// The compression ratio for some `proof` which is aggregating `n` Falcon signatures
 ///
 /// Calculated using the size of the proof over the total size of the `n` signatures.
+#[allow(clippy::cast_precision_loss)]
 pub fn compression_ratio<const C: usize, R: SuitableRing>(n: usize, proof: &LFProof<C, R>) -> f64 {
     // TODO move, add 1024 deg support (1280 bytes)
     let sig_len: usize = 666;
