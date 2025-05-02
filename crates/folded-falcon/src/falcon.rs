@@ -26,15 +26,24 @@ use falcon_rust::{
 };
 use itertools::Itertools;
 
+/// The Falcon modulus
 pub const FALCON_MOD: u16 = 12289;
 
+/// Degree-512 Falcon config
 pub struct Falcon512;
+
+/// Degree-1024 Falcon config
 pub struct Falcon1024;
 
+/// Falcon signature-related operations
 pub trait FalconOps: FalconParams {
+    /// Generate a Falcon keypair from some seed
     fn keygen(seed: [u8; 32]) -> (Self::SecretKey, Self::PublicKey);
+    /// Sign a message
     fn sign(m: &[u8], sk: &Self::SecretKey) -> Self::Signature;
+    /// Verify a message's signature
     fn verify(m: &[u8], sig: &Self::Signature, pk: &Self::PublicKey) -> bool;
+    /// Create constraint system inputs out of Falcon signature-related values
     fn deserialize(
         m: &[u8],
         sig: &Self::Signature,
@@ -138,22 +147,27 @@ fn deserialize<const N: usize>(
     (public, sig)
 }
 
+/// A Falcon polynomial of degree N
 #[derive(Clone, Debug)]
 pub struct FalconPoly<const N: usize>([u16; N]);
 
 impl<const N: usize> FalconPoly<N> {
+    /// Create the zero polynomial representation
     pub fn new() -> Self {
         Self([0u16; N])
     }
 
+    /// Create [`Self`] from an array of `N` coefficients
     pub fn from_coeffs(coeffs: [u16; N]) -> Self {
         Self(coeffs)
     }
 
+    /// Return the polynomial coefficients
     pub fn coeffs(&self) -> &[u16] {
         &self.0
     }
 
+    /// Return the polynomial coefficients as mutable
     pub fn coeffs_mut(&mut self) -> &mut [u16] {
         &mut self.0
     }

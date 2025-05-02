@@ -4,7 +4,7 @@ mod ops;
 pub use builder::{R1CSBuilder, ZBuildError, ZBuilder};
 pub use ops::{CSRing, Input, UnitMonomial};
 
-use crate::{FALCON_MOD, FalconInput, FalconSig, SplitRingPoly};
+use crate::{FalconInput, FalconSig, SplitRingPoly, falcon::FALCON_MOD};
 use ark_ff::Field;
 use cyclotomic_rings::rings::SuitableRing;
 use latticefold::arith::r1cs::{
@@ -12,6 +12,9 @@ use latticefold::arith::r1cs::{
 };
 use stark_rings::balanced_decomposition::convertible_ring::ConvertibleRing;
 
+/// The constraint scheme used in Falcon signature aggregation
+///
+/// Implemented for some [`CSRing`], providing the respective R1CS and `z` vector constructors.
 pub trait ConstraintScheme: CSRing + Sized {
     /// Falcon signature verification R1CS.
     ///
@@ -178,7 +181,9 @@ where
     }
 }
 
-pub fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
+/// A very basic Falcon signature aggregation constraint system
+#[allow(dead_code)]
+fn signature_verification_cs<R: SuitableRing>() -> ConstraintSystem<R> {
     // s1 + s2*h = c
     let mut cs = ConstraintSystem::<R>::new();
     cs.ninputs = 2;

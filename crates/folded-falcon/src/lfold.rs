@@ -21,15 +21,20 @@ type Ajtai<R, const C: usize, const W: usize> = AjtaiCommitmentScheme<C, W, R>;
 /// Single non-accumulated LatticeFold instance
 #[derive(Clone, Debug)]
 pub struct LFComp<R: SuitableRing, const C: usize> {
+    /// Employed CCS
     pub ccs: CCS<R>,
+    /// Committed CCS
     pub cccs: CCCS<C, R>,
+    /// Un-committed witness
     pub witness: Witness<R>,
 }
 
 /// Single non-accumulated LatticeFold instance, without the witness
 #[derive(Clone, Debug)]
 pub struct LFCompVerifier<R: SuitableRing, const C: usize> {
+    /// Employed CCS
     pub ccs: CCS<R>,
+    /// Committed CCS
     pub cccs: CCCS<C, R>,
 }
 
@@ -42,10 +47,15 @@ pub struct LFAcc<
     const C: usize,
     const W: usize,
 > {
+    /// Linearized committed CCS
     pub lcccs: LCCCS<C, R>,
+    /// Last used witness in the accumulated instance
     pub witness: Witness<R>,
+    /// The current prover transcript
     pub transcript: TS<R, CS>,
+    /// The employed Ajtai commitment matrix
     pub ajtai: Ajtai<R, C, W>,
+    /// Number of folding calls
     pub count: usize,
     _dp: PhantomData<DP>,
 }
@@ -93,6 +103,7 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
         ))
     }
 
+    /// Returns the employed Ajtai commitment matrix
     pub const fn ajtai(&self) -> &Ajtai<R, C, W> {
         &self.ajtai
     }
@@ -120,6 +131,7 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
 impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usize>
     LFVerifier<R, DP, CS, C>
 {
+    /// Initialize the verifier context
     pub fn init(comp: &LFComp<R, C>, proof: &LFProof<C, R>) -> Result<Self> {
         let mut transcript = TS::<R, CS>::default();
         let lcccs = linearize::<R, CS, C>(comp)?;
@@ -139,6 +151,7 @@ impl<R: SuitableRing, DP: DecompositionParams, CS: ChallengeSet<R>, const C: usi
         })
     }
 
+    /// Verify some `proof` for the committed witness
     pub fn verify(&mut self, comp: &LFCompVerifier<R, C>, proof: &LFProof<C, R>) -> Result<()> {
         self.lcccs = NIFSVerifier::<C, R, DP, TS<R, CS>>::verify(
             &self.lcccs,
@@ -175,6 +188,9 @@ fn linearize<R: SuitableRing, CS: ChallengeSet<R>, const C: usize>(
     .0)
 }
 
+/// The compression ratio for some `proof` which is aggregating `n` Falcon signatures
+///
+/// Calculated using the size of the proof over the total size of the `n` signatures.
 pub fn compression_ratio<const C: usize, R: SuitableRing>(n: usize, proof: &LFProof<C, R>) -> f64 {
     // TODO move, add 1024 deg support (1280 bytes)
     let sig_len: usize = 666;
