@@ -20,10 +20,10 @@ typos || {
 }
 
 # Linting
-# cargo clippy --all-targets --all-features -- -D warnings || {
-#     echo "❌ Clippy violations (check warnings above)"
-#     exit 4
-# }
+cargo clippy --all-targets --all-features -- -D warnings || {
+    echo "❌ Clippy violations (check warnings above)"
+    exit 4
+}
 
 # Tests
 cargo test --workspace --verbose || {

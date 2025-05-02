@@ -185,12 +185,12 @@ impl<const N: usize> FalconPoly<N> {
         self.0
             .iter()
             .map(|c| {
-                let m = if *c > FALCON_MOD / 2 {
+                let m = u64::from(if *c > FALCON_MOD / 2 {
                     FALCON_MOD - c
                 } else {
                     *c
-                };
-                m as u64 * m as u64
+                });
+                m * m
             })
             .sum::<u64>()
     }
@@ -198,7 +198,10 @@ impl<const N: usize> FalconPoly<N> {
 
 impl<const N: usize> From<&Polynomial<Felt>> for FalconPoly<N> {
     fn from(p: &Polynomial<Felt>) -> Self {
-        Self(core::array::from_fn(|i| p.coefficients[i].value() as u16))
+        // `Felt` is a u32, though `value()` returns an i16
+        Self(core::array::from_fn(|i| {
+            p.coefficients[i].value().unsigned_abs()
+        }))
     }
 }
 

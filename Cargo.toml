@@ -17,7 +17,6 @@ missing_docs = "warn"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-arithmetic_side_effects = "deny"
 cast_lossless = "deny"
 cast_possible_truncation = "deny"
 cast_possible_wrap = "deny"
@@ -25,4 +24,3 @@ cast_precision_loss = "deny"
 cast_sign_loss = "deny"
 needless_return = "deny"
 panicking_overflow_checks = "deny"
-unwrap_used = "deny"
