@@ -9,7 +9,9 @@ use stark_rings::{
 };
 use std::ops::Neg;
 
+/// Ring representation used to build constraint systems
 pub trait CSRing {
+    /// The ring type of the elements which constitute the constraint system
     type Base: SuitableRing;
 
     /// Addition constraint system for rings, `s + sp = t`.
@@ -595,7 +597,9 @@ impl<R: SuitableRing + UnitMonomial> CSRing for R {
     }
 }
 
+/// One-term polynomial with coefficient 1.
 pub trait UnitMonomial {
+    /// Output a one-term polynomial X^d of degree d and coefficient 1.
     fn unit_monomial(d: usize) -> Self;
 }
 
@@ -621,6 +625,7 @@ impl<C: CyclotomicConfig<N>, const N: usize, const D: usize> UnitMonomial
     }
 }
 
+/// A constraint system input type representation used in [`CSRing`]
 #[derive(Clone, Debug)]
 pub struct Input {
     name: String,
@@ -628,6 +633,7 @@ pub struct Input {
 }
 
 impl Input {
+    /// Create a public input
     pub fn public(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -635,6 +641,7 @@ impl Input {
         }
     }
 
+    /// Create a private input
     pub fn private(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -643,6 +650,7 @@ impl Input {
     }
 }
 
+/// The [`Input`]'s type
 #[derive(Clone, Copy, Debug)]
 pub enum InputType {
     /// Public input (x)
@@ -654,7 +662,7 @@ pub enum InputType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FALCON_MOD, SplitRing, SplitRingPoly};
+    use crate::{SplitRing, SplitRingPoly, falcon::FALCON_MOD};
     use cyclotomic_rings::rings::{FrogRingNTT as RqNTT, FrogRingPoly as RqPoly};
     use rand::Rng;
 

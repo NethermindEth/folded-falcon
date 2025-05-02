@@ -1,3 +1,6 @@
+//! Benchmark for fold-1-signature
+#![allow(missing_docs)]
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::time::Duration;
 
@@ -24,7 +27,7 @@ const WIT_LEN: usize = 3260;
 type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 
 #[derive(Clone)]
-pub struct DP {}
+struct DP {}
 impl DecompositionParams for DP {
     const B: u128 = 131072;
     const L: usize = 4;

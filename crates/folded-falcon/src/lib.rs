@@ -1,13 +1,42 @@
+//! # Falcon signature aggregation using LatticeFold
+//!
+//! A proof-of-concept signature aggregation scheme using [LatticeFold](https://github.com/NethermindEth/latticefold) to aggregate Falcon
+//! signatures.
+//!
+//! ## Example
+//! TODO
+//!
+//! ## Circuit
+//! The main contribution of this crate is a low-level circuit (R1CS) containing the Falcon
+//! signature verification method: $s_1 + s_2 h \stackrel{?}{=} c$, where $s_1$ and $s_2$ are
+//! signature components, $h$ is the public key, and $c$ is the hash of the signature random salt
+//! concatenated with the signed message.
+//! Given we that we work with rings with a modulus $q$ much larger than the Falcon modulus $p =
+//! 12289$, a lifting term $pv$ is also added to the main relation.
+//!
+//! Currently, the circuit in-use represents:
+//! - the main relation: $s_1 + s_2 h + pv = c$;
+//! - the $\ell^2$-norm bound check $(s_1, s_2) < \beta$, using an approximated bit-decomposition approach.
+//!
+//! ## Supported rings
+//! Supported rings must implement the [`FoldedRing`] trait.
+//! As of currently only the Frog ring configuration is supported for both Falcon variants
+//! ([`config::F512Frog16`] and [`config::F1024Frog16`]).
+//!
+//! For polynomial rings with degree smaller $d'$ than the Falcon degree $d$ (512 or 1024), an homomorphism is provided
+//! through the [`SplitRing`] type, where the Falcon polynomial is represented using smaller $k = d / d'$ subrings.
+
+/// Usable ring configurations
 pub mod config;
+/// Falcon types and operations
 pub mod falcon;
 mod lfold;
+/// The constraint system (R1CS)
 pub mod r1cs;
 mod subring;
 
 pub use config::FoldedRing;
-pub use falcon::FALCON_MOD;
 pub use lfold::{LFAcc, LFComp, LFVerifier, compression_ratio};
-pub use r1cs::ConstraintScheme;
 pub use subring::{SplitRing, SplitRingPoly};
 
 use falcon::FalconPoly;
@@ -15,7 +44,9 @@ use falcon::FalconPoly;
 /// Witness, signature vector components
 #[derive(Clone, Debug)]
 pub struct FalconSig<const N: usize> {
+    /// First component of the signature
     pub s1: FalconPoly<N>,
+    /// Second component of the signature
     pub s2: FalconPoly<N>,
 }
 

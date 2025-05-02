@@ -50,6 +50,7 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
         Self(s)
     }
 
+    /// Creates `Self` from a [`FalconPoly`]
     pub fn from_fpoly<const N: usize>(p: &FalconPoly<N>) -> Self {
         Self::from_r(p.coeffs())
     }
@@ -137,10 +138,12 @@ impl<S: OverField, const K: usize> SplitRingPoly<S, K> {
         });
     }
 
+    /// Returns the inner subrings, consuming `self`
     pub fn into_array(self) -> [S; K] {
         self.0
     }
 
+    /// Returns a reference to the inner subrings
     pub fn splits(&self) -> &[S] {
         &self.0
     }
@@ -152,10 +155,12 @@ impl<U: SuitableRing, const K: usize> SplitRing<U, K> {
         SplitRingPoly(array::from_fn(|i| self.splits()[i].icrt()))
     }
 
+    /// Returns a reference to the inner subrings
     pub fn splits(&self) -> &[U] {
         &self.0
     }
 
+    /// Returns the inner subrings, consuming `self`
     pub fn into_array(self) -> [U; K] {
         self.0
     }
@@ -376,7 +381,7 @@ impl<U: SuitableRing, const K: usize> Sub for SplitRing<U, K> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FALCON_MOD;
+    use crate::falcon::FALCON_MOD;
 
     use ark_ff::fields::PrimeField;
     use cyclotomic_rings::rings::FrogRingPoly as Poly;

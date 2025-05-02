@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 /// Combine multiple constraint systems into a single [`R1CS`] instance
 pub struct R1CSBuilder<R: CSRing> {
-    pub systems: Vec<ConstraintSystem<R::Base>>,
+    systems: Vec<ConstraintSystem<R::Base>>,
 }
 
 impl<R: CSRing> R1CSBuilder<R> {
@@ -176,14 +176,19 @@ pub struct ZBuilder<R: CSRing> {
     z: Vec<R::Base>,
 }
 
+/// Possible errors on building the `z` vector by [`ZBuilder`]
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum ZBuildError {
+    /// Expected variable length different than that provided
     #[error("unexpected length {1} for variable {0}: expected {2} length")]
     LengthMismatch(String, usize, usize),
+    /// Variable was already assigned
     #[error("variable {0} already set")]
     AlreadySet(String),
+    /// Variable does not exist
     #[error("variable {0} not found")]
     NotFound(String),
+    /// Some variables were not assigned
     #[error("some variables not set: {0:?}")]
     VariablesNotSet(Vec<String>),
 }
