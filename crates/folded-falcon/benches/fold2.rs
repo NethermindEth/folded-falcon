@@ -46,7 +46,7 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
     let sig = Falcon::sign(msg, &sk);
     let (x1, w1) = Falcon::deserialize(msg, &sig, &pk);
 
-    let (r1cs, map) = FR::r1cs(1);
+    let (r1cs, map) = FR::r1cs(2);
     let z = FR::z(&[(x0, w0), (x1, w1)], map).unwrap();
 
     let x_len = r1cs.l;
