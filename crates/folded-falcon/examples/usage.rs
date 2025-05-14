@@ -6,8 +6,6 @@
 //! 3. Verify folded proofs
 //! 4. Serialize and deserialize proofs
 
-use rand;
-
 use folded_falcon::{
     LFAcc, LFComp, LFVerifier,
     config::{F512Frog16 as FR, FoldedRing},
@@ -89,8 +87,8 @@ fn main() -> Result<()> {
 
     // Step 6: Verify the folded proof
     let compv = comp.clone().into();
-    let result = ctx.verify(&compv, &fold_proof)?;
-    println!("Verification result: {:?}", result);
+    ctx.verify(&compv, &fold_proof)?;
+    println!("Verification result: {:?}", ());
 
     Ok(())
 }
