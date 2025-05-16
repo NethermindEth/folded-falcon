@@ -12,6 +12,10 @@ use folded_falcon::{
     falcon::FalconOps,
 };
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+use latticefold::nifs::LFProof;
+use std::io::Cursor;
 use anyhow::Result;
 
 use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
@@ -82,6 +86,16 @@ fn main() -> Result<()> {
     // Step 4: Fold computation into accumulator
     let fold_proof = acc.fold(&comp)?;
 
+    // Step 4.1: Serialize the proof
+    let mut serialized_proof = Vec::new();
+    fold_proof.serialize_compressed(&mut serialized_proof)?;
+    println!("Serialized proof size: {} bytes", serialized_proof.len());
+
+    // Step 4.2: Deserialize the proof
+    let mut cursor = Cursor::new(&serialized_proof[..]);
+    let deserialized_proof = LFProof::<C, RqNTT>::deserialize_compressed(&mut cursor)?;
+    println!("Deserialized proof size: {:?} bytes", deserialized_proof.compressed_size());
+    
     // Step 5: Initialize verifier
     let mut ctx = LFVerifier::<RqNTT, DP, CS, C>::init(&comp0, &proof)?;
 
