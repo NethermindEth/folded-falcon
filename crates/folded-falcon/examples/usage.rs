@@ -14,9 +14,9 @@ use folded_falcon::{
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
+use anyhow::Result;
 use latticefold::nifs::LFProof;
 use std::io::Cursor;
-use anyhow::Result;
 
 use cyclotomic_rings::rings::{FrogChallengeSet as CS, FrogRingNTT as RqNTT};
 use latticefold::{
@@ -94,8 +94,11 @@ fn main() -> Result<()> {
     // Step 4.2: Deserialize the proof
     let mut cursor = Cursor::new(&serialized_proof[..]);
     let deserialized_proof = LFProof::<C, RqNTT>::deserialize_compressed(&mut cursor)?;
-    println!("Deserialized proof size: {:?} bytes", deserialized_proof.compressed_size());
-    
+    println!(
+        "Deserialized proof size: {:?} bytes",
+        deserialized_proof.compressed_size()
+    );
+
     // Step 5: Initialize verifier
     let mut ctx = LFVerifier::<RqNTT, DP, CS, C>::init(&comp0, &proof)?;
 
