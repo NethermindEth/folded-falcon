@@ -28,17 +28,26 @@ use rand::Rng;
 
 type Falcon = <FR as FoldedRing>::Variant;
 
+// Security parameter for Ajtai commitments (length of Ajtai commitment vectors).
 const C: usize = 38;
+// Effective witness length after decomposition (original witness length * number of limbs).
 const W: usize = WIT_LEN * DP::L;
+// Original witness length before decomposition.
 const WIT_LEN: usize = 3260;
 type Ajtai = AjtaiCommitmentScheme<C, W, RqNTT>;
 
+// Struct to hold decomposition parameters.
 #[derive(Clone)]
 struct DP {}
+// Implementation of decomposition parameters for the DP struct.
 impl DecompositionParams for DP {
+    // Large modulus or bound for decomposition.
     const B: u128 = 131072;
+    // Number of levels or limbs in the decomposition.
     const L: usize = 4;
+    // Smaller base or bound used in decomposition.
     const B_SMALL: usize = 2;
+    // Parameter K for decomposition (e.g., bits per limb or security parameter).
     const K: usize = 17;
 }
 
@@ -49,6 +58,7 @@ fn dummy_comp(ajtai: &Ajtai) -> Result<LFComp<RqNTT, C>> {
 
     let (x, w) = Falcon::deserialize(msg, &sig, &pk);
 
+    // The number 1 for the FR::r1cs(1) function represents the number of signature verifications per circuit.
     let (r1cs, map) = FR::r1cs(1);
     let z = FR::z(&[(x, w)], map).unwrap();
 
@@ -105,7 +115,7 @@ fn main() -> Result<()> {
     // Step 6: Verify the folded proof
     let compv = comp.clone().into();
     ctx.verify(&compv, &fold_proof)?;
-    println!("Verification result: {:?}", ());
+    println!("Verification result: {:?}", ("Verification OK".to_string()));
 
     Ok(())
 }
